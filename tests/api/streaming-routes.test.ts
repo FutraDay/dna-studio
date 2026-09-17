@@ -131,14 +131,23 @@ describe("POST /api/campaigns/generate", () => {
   };
 
   const CONCEPTS = {
-    concepts: [
-      {
-        name: "Morning ritual",
-        assets: [
-          { platform: "instagram", caption: "Hi", hashtags: ["coffee"], imagePrompt: "a mug" },
-        ],
-      },
-    ],
+    concepts: Array.from({ length: 5 }, (_, index) => ({
+      name: `Concept ${index + 1}`,
+      assets: [
+        {
+          platform: "instagram",
+          caption: `Coffee idea ${index + 1} for home brewers.`,
+          hashtags: ["coffee"],
+          imagePrompt: [
+            "barista serving a customer",
+            "coffee beans on a roastery table",
+            "before and after cafe counter",
+            "roaster checking fresh beans",
+            "cafe owner opening the shop",
+          ][index],
+        },
+      ],
+    })),
   };
 
   beforeEach(() => {
@@ -153,6 +162,7 @@ describe("POST /api/campaigns/generate", () => {
     ["a missing goal", { brandId: "brand_1", platforms: ["instagram"] }],
     ["an empty goal", { ...validBody, goal: "" }],
     ["an unsupported platform", { ...validBody, platforms: ["myspace"] }],
+    ["no selected platforms", { ...validBody, platforms: [] }],
   ])("answers 400 for %s", async (_label, body) => {
     const response = await generate(post("/api/campaigns/generate", body));
     expect(response.status).toBe(400);
@@ -184,34 +194,37 @@ describe("POST /api/campaigns/generate", () => {
   it("creates one asset per concept asset", async () => {
     await readEvents(await generate(post("/api/campaigns/generate", validBody)));
 
-    expect(campaign.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          brandId: "brand_1",
-          userId: "user_1",
-          goal: "Launch cold brew",
-          assets: {
-            create: [
-              {
-                platform: "instagram",
-                caption: "Hi",
-                hashtags: ["coffee"],
-                imagePrompt: "a mug",
-                status: "draft",
-              },
-            ],
-          },
-        }),
-      })
-    );
+    const created = campaign.create.mock.calls[0][0] as unknown as {
+      data: {
+        brandId: string;
+        userId: string;
+        goal: string;
+        assets: { create: Array<{ platform: string; caption: string; status: string }> };
+      };
+    };
+    expect(created.data.brandId).toBe("brand_1");
+    expect(created.data.userId).toBe("user_1");
+    expect(created.data.goal).toBe("Launch cold brew");
+    expect(created.data.assets.create).toHaveLength(5);
+    expect(created.data.assets.create[0]).toMatchObject({
+      platform: "instagram",
+      caption: "Coffee idea 1 for home brewers.",
+      status: "draft",
+    });
   });
-
   it("stores a null image prompt when the model omits one", async () => {
     stream.mockImplementation(async function* () {
       yield JSON.stringify({
-        concepts: [
-          { name: "n", assets: [{ platform: "instagram", caption: "Hi", hashtags: [] }] },
-        ],
+        concepts: Array.from({ length: 5 }, (_, index) => ({
+          name: `Concept ${index + 1}`,
+          assets: [
+            {
+              platform: "instagram",
+              caption: `Coffee idea ${index + 1} for home brewers.`,
+              hashtags: [],
+            },
+          ],
+        })),
       });
     } as never);
 
@@ -222,7 +235,32 @@ describe("POST /api/campaigns/generate", () => {
     };
     expect(created.data.assets.create[0].imagePrompt).toBeNull();
   });
+  it("rejects incomplete campaign coverage before saving", async () => {
+    stream.mockImplementation(async function* () {
+      yield JSON.stringify({ concepts: CONCEPTS.concepts.slice(0, 2) });
+    } as never);
 
+    const events = await readEvents(await generate(post("/api/campaigns/generate", validBody)));
+
+    expect(events.at(-1)).toMatchObject({ type: "error" });
+    expect(events.at(-1).message).toContain("Campaign quality check failed");
+    expect(events.at(-1).message).toContain("Expected exactly 5 campaign concepts");
+    expect(campaign.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects fabricated company evidence before saving", async () => {
+    const invalid = JSON.parse(JSON.stringify(CONCEPTS));
+    invalid.concepts[0].assets[0].caption = "See how XYZ Co. boosted efficiency with automation.";
+    stream.mockImplementation(async function* () {
+      yield JSON.stringify(invalid);
+    } as never);
+
+    const events = await readEvents(await generate(post("/api/campaigns/generate", validBody)));
+
+    expect(events.at(-1)).toMatchObject({ type: "error" });
+    expect(events.at(-1).message).toContain("unverified company");
+    expect(campaign.create).not.toHaveBeenCalled();
+  });
   it("reports an error event when the model returns no JSON", async () => {
     stream.mockImplementation(async function* () {
       yield "I cannot help with that.";

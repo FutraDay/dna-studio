@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { requireSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
-import { streamCampaign } from "@/lib/campaigns/generator";
+import { streamCampaign, type GeneratedCampaign } from "@/lib/campaigns/generator";
+import { formatCampaignQualityError, validateCampaignQuality } from "@/lib/campaigns/quality";
 import type { BrandDNA } from "@/lib/brand-dna/types";
 
 const generateSchema = z.object({
   brandId: z.string(),
   goal: z.string().min(1),
-  platforms: z.array(z.enum(["instagram", "linkedin", "facebook", "twitter"])),
+  platforms: z.array(z.enum(["instagram", "linkedin", "facebook", "twitter"])).min(1),
   language: z.string().default("English"),
 });
 
@@ -51,14 +53,18 @@ export async function POST(request: Request) {
           // Parse the completed content and save
           const match = fullContent.match(/\{[\s\S]*\}/);
           if (!match) throw new Error("LLM did not return valid JSON for campaign");
-          const generated = JSON.parse(match[0]);
+          const generated = JSON.parse(match[0]) as GeneratedCampaign;
+          const quality = validateCampaignQuality(generated, dna, goal, platforms);
+          if (!quality.passed) {
+            throw new Error(formatCampaignQualityError(quality));
+          }
 
           const campaign = await prisma.campaign.create({
             data: {
               brandId,
               userId: session.user.id,
               goal,
-              concepts: generated.concepts,
+              concepts: generated.concepts as unknown as Prisma.InputJsonValue,
               assets: {
                 create: generated.concepts.flatMap(
                   (concept: { assets: Array<{ platform: string; caption: string; hashtags: string[]; imagePrompt?: string }> }) =>
