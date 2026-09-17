@@ -4,6 +4,7 @@ import type { GeneratedCampaign } from "./generator";
 export type CampaignQualityIssueCode =
   | "concept_count"
   | "platform_coverage"
+  | "strategy_coverage"
   | "invalid_asset"
   | "twitter_length"
   | "duplicate_caption"
@@ -11,6 +12,10 @@ export type CampaignQualityIssueCode =
   | "generic_cliche"
   | "unsupported_metric"
   | "unsupported_entity"
+  | "unsupported_evidence_claim"
+  | "unsupported_offer"
+  | "unsupported_resource"
+  | "concept_similarity"
   | "repetitive_visuals";
 
 export interface CampaignQualityIssue {
@@ -36,6 +41,38 @@ const VISUAL_DEVICE_TERMS = /\b(?:dashboard|laptop|monitor|screen|device|interfa
 const METRIC_PATTERN = /\$\s?\d[\d,.]*|\b\d[\d,.]*\s?(?:%|percent|hours?|hrs?|days?|weeks?|months?|x|k|m|million|thousand)(?=\s|[.,!?;:]|$)/gi;
 const COMPANY_PATTERN = /\b[A-Z][A-Za-z0-9&'-]*(?:\s+[A-Z][A-Za-z0-9&'-]*){0,2}\s+(?:Co|Company|Corp|Inc|Ltd|Pty(?:\s+Ltd)?)\.?\b/g;
 
+const EXPECTED_STRATEGIES = [
+  "problem_awareness",
+  "education",
+  "proof_trust",
+  "solution_product",
+  "conversion",
+] as const;
+
+const EVIDENCE_CLAIM_PATTERNS = [
+  /\b(?:our\s+)?(?:latest\s+)?case stud(?:y|ies)\b/i,
+  /\b(?:customer|client|business)\s+(?:success|case)\s+stor(?:y|ies)\b/i,
+  /\bsuccess stor(?:y|ies)\b/i,
+  /\bsee how we (?:helped|transformed|streamlined|improved|saved)\b/i,
+  /\b(?:we|we've|we have)\s+(?:helped|worked with|partnered with|supported)\b/i,
+  /\bpartnered with us\b/i,
+  /\b(?:a|the|our)\s+(?:local\s+|small\s+)?business\s+(?:partnered|worked|used|adopted|implemented|transformed|streamlined|saved|reduced|increased|boosted|improved)\b/i,
+];
+
+const HYPOTHETICAL_PATTERN = /\b(?:hypothetical|for example|as an example|could hypothetically)\b/i;
+const OFFER_PATTERN = /\b(?:free|complimentary|no[- ]obligation)\s+(?:consultation|audit|assessment|demo|trial|quote|review|strategy session)\b|\b(?:special offer|limited[- ]time offer|discount|guarantee)\b/gi;
+const RESOURCE_PATTERN = /\b(?:download|grab|access|get|our)\s+(?:our\s+|a\s+|the\s+|free\s+)?(?:[a-z]+\s+){0,2}(?:checklist|guide|template|ebook|e-book|report|playbook|webinar|worksheet|calculator)\b/gi;
+
+const CONTENT_STOP_WORDS = new Set([
+  "about", "after", "again", "also", "around", "because", "before", "brand",
+  "business", "businesses", "custom", "from", "generic", "help", "helps", "into",
+  "more", "need", "needs", "only", "other", "product", "service", "services", "solution",
+  "solutions", "software", "system", "systems", "than", "that", "their", "them", "then",
+  "there", "these", "they", "this", "through", "using", "what", "when", "where", "which",
+  "with", "without", "work", "works", "your", "youre", "problem", "awareness", "education",
+  "proof", "trust", "conversion", "instagram", "linkedin", "facebook", "twitter",
+]);
+
 function normalize(value: string): string {
   return value
     .toLowerCase()
@@ -50,7 +87,68 @@ function hookKey(caption: string): string {
 }
 
 function evidenceText(dna: BrandDNA, goal: string): string {
-  return [dna.name, dna.tagline, dna.rawText, goal].filter(Boolean).join(" ").toLowerCase();
+  return `${JSON.stringify(dna)} ${goal}`.toLowerCase();
+}
+function hasVerifiedNamedEntity(caption: string, evidence: string): boolean {
+  const entities = caption.match(COMPANY_PATTERN) ?? [];
+  return entities.some((entity) =>
+    evidence.includes(entity.toLowerCase().replace(/\.$/, ""))
+  );
+}
+
+function unsupportedEvidencePhrase(caption: string, evidence: string): string | null {
+  if (HYPOTHETICAL_PATTERN.test(caption) || hasVerifiedNamedEntity(caption, evidence)) {
+    return null;
+  }
+
+  for (const pattern of EVIDENCE_CLAIM_PATTERNS) {
+    const match = caption.match(pattern);
+    if (match?.[0]) return match[0];
+  }
+  return null;
+}
+
+function unsupportedPhrases(caption: string, evidence: string, pattern: RegExp): string[] {
+  const evidenceNormalized = normalize(evidence);
+  return (caption.match(pattern) ?? []).filter(
+    (phrase) => !evidenceNormalized.includes(normalize(phrase))
+  );
+}
+
+function conceptTokens(
+  concept: GeneratedCampaign["concepts"][number],
+  brandName: string
+): Set<string> {
+  const brandTokens = new Set(normalize(brandName).split(" ").filter(Boolean));
+  const source = [
+    concept.name,
+    concept.description,
+    concept.theme,
+    ...concept.assets.map((asset) => asset.caption),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return new Set(
+    normalize(source)
+      .split(" ")
+      .filter(
+        (token) =>
+          token.length >= 4 &&
+          !CONTENT_STOP_WORDS.has(token) &&
+          !brandTokens.has(token)
+      )
+  );
+}
+
+function jaccardSimilarity(left: Set<string>, right: Set<string>): number {
+  if (left.size === 0 || right.size === 0) return 0;
+  let intersection = 0;
+  for (const token of left) {
+    if (right.has(token)) intersection += 1;
+  }
+  const union = left.size + right.size - intersection;
+  return union === 0 ? 0 : intersection / union;
 }
 
 export function validateCampaignQuality(
@@ -74,6 +172,14 @@ export function validateCampaignQuality(
   const evidence = evidenceText(dna, goal);
 
   concepts.forEach((concept, conceptIndex) => {
+    const expectedStrategy = EXPECTED_STRATEGIES[conceptIndex];
+    if (expectedStrategy && concept.strategy !== expectedStrategy) {
+      issues.push({
+        code: "strategy_coverage",
+        message: `Concept ${conceptIndex + 1} must use strategy "${expectedStrategy}" but received "${concept.strategy || "missing"}".`,
+      });
+    }
+
     const assets = Array.isArray(concept?.assets) ? concept.assets : [];
     const counts = new Map<string, number>();
 
@@ -134,6 +240,28 @@ export function validateCampaignQuality(
           });
         }
       }
+
+      const evidencePhrase = unsupportedEvidencePhrase(asset.caption, evidence);
+      if (evidencePhrase) {
+        issues.push({
+          code: "unsupported_evidence_claim",
+          message: `Concept ${conceptIndex + 1} implies unverified customer evidence with "${evidencePhrase}". Use verified named evidence or frame the example as hypothetical.`,
+        });
+      }
+
+      for (const offer of unsupportedPhrases(asset.caption, evidence, OFFER_PATTERN)) {
+        issues.push({
+          code: "unsupported_offer",
+          message: `Concept ${conceptIndex + 1} invents unsupported offer "${offer}".`,
+        });
+      }
+
+      for (const resource of unsupportedPhrases(asset.caption, evidence, RESOURCE_PATTERN)) {
+        issues.push({
+          code: "unsupported_resource",
+          message: `Concept ${conceptIndex + 1} invents unsupported resource "${resource}". Include the resource inline or remove the claim.`,
+        });
+      }
     }
 
     for (const platform of platforms) {
@@ -180,6 +308,19 @@ export function validateCampaignQuality(
         code: "repeated_hook",
         message: `Opening hook "${hook}" is repeated across ${count} assets.`,
       });
+    }
+  }
+  const conceptTokenSets = concepts.map((concept) => conceptTokens(concept, dna.name));
+  for (let left = 0; left < conceptTokenSets.length; left++) {
+    for (let right = left + 1; right < conceptTokenSets.length; right++) {
+      const sharedTerms = [...conceptTokenSets[left]].filter((token) => conceptTokenSets[right].has(token)).length;
+      const similarity = jaccardSimilarity(conceptTokenSets[left], conceptTokenSets[right]);
+      if (sharedTerms >= 4 && similarity >= 0.5) {
+        issues.push({
+          code: "concept_similarity",
+          message: `Concepts ${left + 1} and ${right + 1} are too semantically similar (${Math.round(similarity * 100)}% keyword overlap). Give them different pains, outcomes, examples, or buying motivations.`,
+        });
+      }
     }
   }
 

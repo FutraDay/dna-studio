@@ -104,6 +104,19 @@ describe("buildCampaignPrompt", () => {
     expect(prompt).toContain("Do not reuse the same opening hook");
   });
 
+  it("includes the verified source excerpt for evidence grounding", () => {
+    const prompt = buildCampaignPrompt(dna, "goal", ["instagram"]);
+    expect(prompt).toContain("VERIFIED SOURCE EXCERPT");
+    expect(prompt).toContain("Acme Coffee roasts single origin beans in small batches.");
+  });
+
+  it("requires explicit strategic roles and evidence integrity", () => {
+    const prompt = buildCampaignPrompt(dna, "goal", ["instagram"]);
+    expect(prompt).toContain('"strategy": "<problem_awareness|education|proof_trust|solution_product|conversion>"');
+    expect(prompt).toContain("EVIDENCE INTEGRITY RULES");
+    expect(prompt).toContain("Do not invent a free consultation");
+    expect(prompt).toContain("Hypothetical examples must be explicitly framed as hypothetical");
+  });
   it("requires genuine platform adaptation", () => {
     const prompt = buildCampaignPrompt(dna, "goal", ["instagram", "linkedin"]);
     expect(prompt).toContain("genuinely platform-specific content");

@@ -131,13 +131,28 @@ describe("POST /api/campaigns/generate", () => {
     platforms: ["instagram"],
   };
 
+  const STRATEGIES = [
+    "problem_awareness",
+    "education",
+    "proof_trust",
+    "solution_product",
+    "conversion",
+  ] as const;
+  const CAPTIONS = [
+    "Missed follow-ups can leave worthwhile coffee orders sitting idle.",
+    "Map the brewing handoff before automating repetitive preparation steps.",
+    "Use a transparent roast process demo to evaluate consistency without invented claims.",
+    "Connect ordering and fulfilment around the workflow your cafe already uses.",
+    "Compare scattered subscriptions with one tailored operating approach before deciding.",
+  ];
   const CONCEPTS = {
     concepts: Array.from({ length: 5 }, (_, index) => ({
       name: `Concept ${index + 1}`,
+      strategy: STRATEGIES[index],
       assets: [
         {
           platform: "instagram",
-          caption: `Coffee idea ${index + 1} for home brewers.`,
+          caption: CAPTIONS[index],
           hashtags: ["coffee"],
           imagePrompt: [
             "barista serving a customer",
@@ -210,7 +225,7 @@ describe("POST /api/campaigns/generate", () => {
     expect(created.data.assets.create).toHaveLength(5);
     expect(created.data.assets.create[0]).toMatchObject({
       platform: "instagram",
-      caption: "Coffee idea 1 for home brewers.",
+      caption: CAPTIONS[0],
       status: "draft",
     });
   });
@@ -219,10 +234,11 @@ describe("POST /api/campaigns/generate", () => {
       yield JSON.stringify({
         concepts: Array.from({ length: 5 }, (_, index) => ({
           name: `Concept ${index + 1}`,
+          strategy: STRATEGIES[index],
           assets: [
             {
               platform: "instagram",
-              caption: `Coffee idea ${index + 1} for home brewers.`,
+              caption: CAPTIONS[index],
               hashtags: [],
             },
           ],

@@ -2,8 +2,11 @@ import type { BrandDNA } from "../brand-dna/types";
 import { generateJSON, streamText, type LLMMessage } from "../llm/client";
 import { buildCampaignPrompt } from "./prompt-builder";
 
+export type CampaignStrategy = "problem_awareness" | "education" | "proof_trust" | "solution_product" | "conversion";
+
 export interface CampaignConcept {
   name: string;
+  strategy?: CampaignStrategy;
   description: string;
   theme: string;
   assets: CampaignAsset[];

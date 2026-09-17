@@ -4,6 +4,20 @@ import { validateCampaignQuality } from "@/lib/campaigns/quality";
 import { makeBrandDNA } from "../../fixtures/brand-dna";
 
 const dna = makeBrandDNA();
+const strategies = [
+  "problem_awareness",
+  "education",
+  "proof_trust",
+  "solution_product",
+  "conversion",
+] as const;
+const conceptCaptions = [
+  "Missed quote follow-ups can leave good jobs sitting idle.",
+  "Map each handoff before automating repetitive admin steps.",
+  "A process demo can show where manual work creates avoidable delays.",
+  "Connect quoting and customer updates around the workflow your team already uses.",
+  "Compare scattered subscriptions with one tailored operating system before deciding.",
+];
 const visualPrompts = [
   "barista serving a customer in a warm cafe",
   "close-up of fresh coffee beans on a roastery table",
@@ -16,11 +30,12 @@ function makeCampaign(platforms: string[] = ["instagram"]): GeneratedCampaign {
   return {
     concepts: Array.from({ length: 5 }, (_, conceptIndex) => ({
       name: `Concept ${conceptIndex + 1}`,
+      strategy: strategies[conceptIndex],
       description: `Description ${conceptIndex + 1}`,
       theme: `theme-${conceptIndex + 1}`,
       assets: platforms.map((platform) => ({
         platform,
-        caption: `${platform} angle ${conceptIndex + 1}: useful coffee guidance for home brewers.`,
+        caption: `${platform}: ${conceptCaptions[conceptIndex]}`,
         hashtags: ["coffee"],
         cta: `CTA ${conceptIndex + 1}`,
         imagePrompt: visualPrompts[conceptIndex],
@@ -101,6 +116,83 @@ describe("validateCampaignQuality", () => {
     expect(result.issues.some((issue) => issue.code === "repeated_hook")).toBe(true);
   });
 
+  it("requires the five strategic roles in the expected order", () => {
+    const campaign = makeCampaign();
+    campaign.concepts[0].strategy = "education";
+    const result = validateCampaignQuality(campaign, dna, "goal", ["instagram"]);
+    expect(result.issues.some((issue) => issue.code === "strategy_coverage")).toBe(true);
+  });
+
+  it.each([
+    "Success story alert! A local business partnered with us to reclaim time.",
+    "Explore our latest case study: A small business transformed its operations.",
+    "See how we helped a local business streamline their operations.",
+  ])("rejects unverified customer proof: %s", (caption) => {
+    const campaign = makeCampaign();
+    campaign.concepts[2].assets[0].caption = caption;
+    const result = validateCampaignQuality(campaign, dna, "goal", ["instagram"]);
+    expect(result.issues.some((issue) => issue.code === "unsupported_evidence_claim")).toBe(true);
+  });
+
+  it("allows a case study when the named customer is present in verified evidence", () => {
+    const campaign = makeCampaign();
+    campaign.concepts[2].assets[0].caption =
+      "Case study: Northside Builders Pty Ltd partnered with us to streamline quoting.";
+    const verifiedDna = makeBrandDNA({
+      rawText: "Case study: Northside Builders Pty Ltd partnered with us to streamline quoting.",
+    });
+    const result = validateCampaignQuality(campaign, verifiedDna, "goal", ["instagram"]);
+    expect(result.issues.some((issue) => issue.code === "unsupported_evidence_claim")).toBe(false);
+    expect(result.issues.some((issue) => issue.code === "unsupported_entity")).toBe(false);
+  });
+
+  it("rejects an invented free consultation", () => {
+    const campaign = makeCampaign();
+    campaign.concepts[4].assets[0].caption = "Book a free consultation to discuss your workflow.";
+    const result = validateCampaignQuality(campaign, dna, "goal", ["instagram"]);
+    expect(result.issues.some((issue) => issue.code === "unsupported_offer")).toBe(true);
+  });
+
+  it("allows an offer explicitly supplied in the campaign goal", () => {
+    const campaign = makeCampaign();
+    campaign.concepts[4].assets[0].caption = "Book a free consultation to discuss your workflow.";
+    const result = validateCampaignQuality(
+      campaign,
+      dna,
+      "Promote our free consultation for Australian businesses",
+      ["instagram"]
+    );
+    expect(result.issues.some((issue) => issue.code === "unsupported_offer")).toBe(false);
+  });
+
+  it("rejects invented downloadable brand resources but allows an inline checklist", () => {
+    const campaign = makeCampaign();
+    campaign.concepts[1].assets[0].caption = "Download our efficiency checklist to audit your workflow.";
+    let result = validateCampaignQuality(campaign, dna, "goal", ["instagram"]);
+    expect(result.issues.some((issue) => issue.code === "unsupported_resource")).toBe(true);
+
+    campaign.concepts[1].assets[0].caption =
+      "Try this checklist now: map the handoff, note the delay, then remove the repeated step.";
+    result = validateCampaignQuality(campaign, dna, "goal", ["instagram"]);
+    expect(result.issues.some((issue) => issue.code === "unsupported_resource")).toBe(false);
+  });
+
+  it("rejects concepts that are semantically near-duplicates", () => {
+    const campaign = makeCampaign();
+    campaign.concepts[0].name = "Admin workflow delays";
+    campaign.concepts[0].description = "Manual admin quoting follow ups create workflow delays for service teams.";
+    campaign.concepts[0].theme = "admin";
+    campaign.concepts[0].assets[0].caption =
+      "Manual admin and quoting follow ups create workflow delays for service teams every week.";
+    campaign.concepts[1].name = "Admin workflow bottlenecks";
+    campaign.concepts[1].description = "Manual admin quoting follow ups create workflow delays for trade teams.";
+    campaign.concepts[1].theme = "admin";
+    campaign.concepts[1].assets[0].caption =
+      "Manual admin and quoting follow ups create workflow delays for trade teams every day.";
+
+    const result = validateCampaignQuality(campaign, dna, "goal", ["instagram"]);
+    expect(result.issues.some((issue) => issue.code === "concept_similarity")).toBe(true);
+  });
   it("rejects campaigns dominated by dashboard and device imagery", () => {
     const campaign = makeCampaign();
     campaign.concepts.forEach((concept, index) => {
