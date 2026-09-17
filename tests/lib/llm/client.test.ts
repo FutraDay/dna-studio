@@ -64,6 +64,22 @@ describe("getLLMProvider", () => {
     expect(OllamaProvider).toHaveBeenCalledWith("http://ollama:11434", "llama3.1");
   });
 
+  it("forces Ollama when LOCAL_LLM_ONLY is enabled", async () => {
+    resolveSettings.mockResolvedValue(settings({ llmProvider: "openai", llmApiKey: "sk-paid", llmModel: "gpt-paid" }));
+    vi.stubEnv("LOCAL_LLM_ONLY", "true");
+    vi.stubEnv("OLLAMA_BASE_URL", "http://ollama:11434");
+    vi.stubEnv("OLLAMA_MODEL", "llama3.1:8b");
+
+    try {
+      const { getLLMProvider } = await freshClient();
+      await getLLMProvider();
+      expect(OllamaProvider).toHaveBeenCalledWith("http://ollama:11434", "llama3.1:8b");
+      expect(OpenAIProvider).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("rejects an unknown provider by name", async () => {
     resolveSettings.mockResolvedValue(settings({ llmProvider: "hal9000" }));
     const { getLLMProvider } = await freshClient();

@@ -117,6 +117,7 @@ All configuration is done via environment variables. See [`.env.example`](.env.e
 | `REDIS_URL` | Redis connection string | Yes |
 | `NEXTAUTH_SECRET` | Random secret for session encryption | Yes |
 | `LLM_PROVIDER` | AI provider: `openai`, `anthropic`, `ollama`, `gemini` | Yes |
+| `LOCAL_LLM_ONLY` | Set `true` to force text generation through Ollama and block hosted LLM calls | No |
 | `OPENAI_API_KEY` | OpenAI API key (if using OpenAI) | Conditional |
 | `ANTHROPIC_API_KEY` | Anthropic API key (if using Anthropic) | Conditional |
 | `GOOGLE_API_KEY` | Google API key (if using Gemini) | Conditional |

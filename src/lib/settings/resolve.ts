@@ -100,8 +100,9 @@ export function resolveProviders(
   userSettings: UserSettings,
   env: Partial<NodeJS.ProcessEnv> = process.env
 ): EffectiveProviders {
+  const localLlmOnly = /^(?:1|true|yes)$/i.test(env.LOCAL_LLM_ONLY || "");
   return {
-    llmProvider: userSettings.llmProvider || env.LLM_PROVIDER || "openai",
+    llmProvider: localLlmOnly ? "ollama" : userSettings.llmProvider || env.LLM_PROVIDER || "openai",
     imageProvider: userSettings.imageProvider || env.IMAGE_PROVIDER || "openai",
     videoProvider: userSettings.videoProvider || env.VIDEO_PROVIDER || "veo",
   };
@@ -128,12 +129,15 @@ export async function resolveSettings(): Promise<ResolvedSettings> {
     // Fall through to env vars
   }
 
+  const localLlmOnly = /^(?:1|true|yes)$/i.test(process.env.LOCAL_LLM_ONLY || "");
   const { llmProvider, imageProvider, videoProvider } = resolveProviders(userSettings);
 
-  const llmApiKey = resolveCredential("llmApiKey", llmProvider, userSettings).value;
+  const llmApiKey = localLlmOnly
+    ? ""
+    : resolveCredential("llmApiKey", llmProvider, userSettings).value;
 
-  // Resolve model
-  let llmModel = userSettings.llmModel || "";
+  // Resolve model. Local-only mode must not carry a hosted-provider model from saved settings.
+  let llmModel = localLlmOnly ? "" : userSettings.llmModel || "";
   if (!llmModel) {
     switch (llmProvider) {
       case "openai":
@@ -155,7 +159,9 @@ export async function resolveSettings(): Promise<ResolvedSettings> {
 
   const videoApiKey = resolveCredential("videoApiKey", videoProvider, userSettings).value;
 
-  const ollamaUrl = resolveCredentialWithDefault("ollamaUrl", "ollama", userSettings).value;
+  const ollamaUrl = localLlmOnly
+    ? process.env.OLLAMA_BASE_URL || DEFAULT_OLLAMA_URL
+    : resolveCredentialWithDefault("ollamaUrl", "ollama", userSettings).value;
 
   return {
     llmProvider,

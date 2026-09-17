@@ -53,7 +53,16 @@ export async function getLLMProvider(): Promise<LLMProvider> {
     providerType = process.env.LLM_PROVIDER || "openai";
   }
 
-  const cacheKey = `${providerType}:${apiKey || "env"}:${model || "default"}`;
+  // Local development cost guard: when enabled, text generation must never
+  // fall through to a paid hosted LLM even if user settings select one.
+  if (/^(?:1|true|yes)$/i.test(process.env.LOCAL_LLM_ONLY || "")) {
+    providerType = "ollama";
+    apiKey = undefined;
+    model = process.env.OLLAMA_MODEL || "llama3.1";
+    ollamaUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+  }
+
+  const cacheKey = `${providerType}:${apiKey || "env"}:${model || "default"}:${ollamaUrl || "default"}`;
   if (cachedProvider && cachedCacheKey === cacheKey) {
     return cachedProvider;
   }

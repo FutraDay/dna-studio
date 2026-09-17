@@ -11,6 +11,7 @@ services:
       NEXTAUTH_URL: http://localhost:3000
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me-in-production}
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LOCAL_LLM_ONLY: ${LOCAL_LLM_ONLY:-false}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
@@ -44,8 +45,11 @@ services:
       DATABASE_URL: postgresql://dnastudio:dnastudio@db:5432/dnastudio
       REDIS_URL: redis://redis:6379
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LOCAL_LLM_ONLY: ${LOCAL_LLM_ONLY:-false}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-}
       TWITTER_API_KEY: ${TWITTER_API_KEY:-}
       TWITTER_API_SECRET: ${TWITTER_API_SECRET:-}
     depends_on:
