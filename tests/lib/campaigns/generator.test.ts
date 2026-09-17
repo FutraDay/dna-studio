@@ -104,6 +104,26 @@ describe("repairCampaign", () => {
     expect(messages[1].content).toContain('"concepts": []');
   });
 
+  it("uses strict style recovery instructions for editorial failures", async () => {
+    json.mockResolvedValue({ concepts: [] } as never);
+
+    await repairCampaign(dna, "goal", ["instagram", "linkedin"], "English", { concepts: [] }, [
+      { code: "question_hook_overuse", message: "9 assets open with questions." },
+      { code: "generic_cliche", message: 'Concept 5 uses generic marketing cliche "worried about".' },
+    ]);
+
+    const messages = json.mock.calls.at(-1)?.[0] as { role: string; content: string }[];
+    expect(messages[1].content).toContain("STRICT STYLE RECOVERY MODE");
+    expect(messages[1].content).toContain("ZERO question-style opening hooks");
+    expect(messages[1].content).toContain("worried about");
+    expect(messages[1].content).toContain("Every asset must have a distinct opening phrase");
+    expect(json).toHaveBeenLastCalledWith(expect.anything(), {
+      maxTokens: 8192,
+      temperature: 0.1,
+      json: true,
+    });
+  });
+
   it("uses a lower temperature for repair work", async () => {
     json.mockResolvedValue({ concepts: [] } as never);
 
