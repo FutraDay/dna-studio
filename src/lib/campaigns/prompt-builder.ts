@@ -88,21 +88,26 @@ EVIDENCE INTEGRITY RULES:
 - An inline educational checklist is allowed when the checklist itself is included in the caption. Do not refer to it as an existing brand resource unless verified.
 - Hypothetical examples must be explicitly framed as hypothetical and must not be presented as customer proof.
 
-PLATFORM RULES:
-7. Instagram: visual-first hook, concise useful caption, natural emoji use only when it fits, and a save/share/comment-friendly CTA.
-8. LinkedIn: professional B2B insight with a clear point of view, useful reasoning, and minimal hashtag clutter. Do not write like an Instagram caption.
-9. Facebook: conversational and relatable, with enough context to stand alone and a low-friction response CTA.
-10. Twitter: under 280 characters, sharp and specific, with no filler. Prefer one strong observation or claim over a compressed long-form post.
-11. All content must match the brand's ${dna.tone.primary} tone.
-12. All content must be in ${language}.
-13. Hashtags must be relevant; avoid repeating an identical hashtag set on every asset.
+PLATFORM CONTENT DIRECTOR RULES:
+7. Treat each platform as a different editorial product. Do not paraphrase the same caption four times. Preserve the concept, but change the hook, structure, emphasis, CTA, and reading experience for each platform.
+8. Instagram: visual-first and scannable. Use a short hook plus 2-5 short paragraphs or an inline mini-list. Favor save/share value, carousel/Reel-friendly framing, and a concise CTA. Natural emojis are optional, not required.
+9. LinkedIn: write a professional B2B insight with a clear point of view. Use an observation, reasoning, and a practical takeaway. Prefer roughly 60-180 words, minimal emoji use, and no more than 3 hashtags. Do not write like an Instagram caption.
+10. Facebook: use a relatable business situation in conversational language, enough context to stand alone, and a low-friction comment/reply CTA. Prefer roughly 45-130 words and no more than 3 hashtags.
+11. Twitter: under 280 characters, ideally 100-240 characters. Lead with a sharp observation or assertion rather than compressing the LinkedIn post. Use no more than 2 hashtags.
+12. Across the entire 20-asset campaign, use no more than 2 question-style opening hooks. Most posts should open with assertions, observations, scenarios, contrasts, or direct statements.
+13. Do not repeat an opening phrase, CTA wording, or identical hashtag set. Do not use "Curious about", "Worried about", "Thinking about", "Ever wondered", or "Ready to" as recurring templates.
+14. Within each concept, the platform captions must be materially different in wording and structure; do not merely shorten or expand the same sentences.
+15. Across the five concepts, include a deliberate editorial mix: a concrete pain scenario, a practical educational/process post, a proof/trust post grounded in verified evidence or transparent process, an objection-handling/product post, and a direct conversion post.
+16. All content must match the brand's ${dna.tone.primary} tone.
+17. All content must be in ${language}.
+18. Hashtags must be relevant and platform-appropriate; never reuse an identical non-empty hashtag set across assets.
 
 VISUAL DIVERSITY RULES:
-14. The five concepts must use materially different visual treatments. Rotate among real-world customer/problem scenes, branded conceptual/process imagery, product/service context, before-and-after or transformation imagery, and outcome-focused scenes.
-15. Do not make every visual a laptop, dashboard, device mockup, or abstract chart, even for software/AI brands.
-16. Do NOT invent fake product screenshots or fake readable UI and present them as the brand's real software. If showing a conceptual interface, make it clearly illustrative and avoid tiny pseudo-text.
-17. Avoid generated marketing copy, labels, statistics, logos, and tiny text inside the image. The social post caption carries the message.
-18. Image prompts must reference the brand's actual colors and visual tone while changing composition, setting, subject, camera angle, and visual metaphor across concepts.`;
+19. The five concepts must use materially different visual treatments. Rotate among real-world customer/problem scenes, branded conceptual/process imagery, product/service context, before-and-after or transformation imagery, and outcome-focused scenes.
+20. Do not make every visual a laptop, dashboard, device mockup, or abstract chart, even for software/AI brands.
+21. Do NOT invent fake product screenshots or fake readable UI and present them as the brand's real software. If showing a conceptual interface, make it clearly illustrative and avoid tiny pseudo-text.
+22. Avoid generated marketing copy, labels, statistics, logos, and tiny text inside the image. The social post caption carries the message.
+23. Image prompts must reference the brand's actual colors and visual tone while changing composition, setting, subject, camera angle, and visual metaphor across concepts.`;
 }
 
 export function buildImagePrompt(

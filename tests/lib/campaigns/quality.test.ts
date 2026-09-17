@@ -11,13 +11,36 @@ const strategies = [
   "solution_product",
   "conversion",
 ] as const;
-const conceptCaptions = [
-  "Missed quote follow-ups can leave good jobs sitting idle.",
-  "Map each handoff before automating repetitive admin steps.",
-  "A process demo can show where manual work creates avoidable delays.",
-  "Connect quoting and customer updates around the workflow your team already uses.",
-  "Compare scattered subscriptions with one tailored operating system before deciding.",
-];
+const platformCaptions: Record<string, string[]> = {
+  instagram: [
+    "That quote you forgot to chase can quietly become a lost job. Save this follow-up reminder.",
+    "Before automating admin, map the handoff: who touches it, where it waits, and what repeats.",
+    "Behind the scenes, compare a manual handoff with the automated version and look for avoidable delays.",
+    "Quoting, customer updates, and follow-ups should move together instead of living in separate tools.",
+    "Five subscriptions can still leave one messy workflow. Check what could be consolidated before adding another app.",
+  ],
+  linkedin: [
+    "Missed quote follow-ups are not merely an admin problem; they reveal a break in the revenue workflow. A reliable system makes ownership and timing explicit.",
+    "Automation works best after the process is understood. Map the handoffs first, then remove repeated steps instead of automating existing confusion.",
+    "Trust in automation starts with process transparency. Show what happens before, during, and after a task so teams can evaluate the workflow on evidence rather than hype.",
+    "The useful question is not how many features software has. It is whether quoting, communication, and follow-up match the way the team actually operates.",
+    "Before buying another subscription, compare the whole operating workflow. Consolidation can be more valuable than adding another isolated tool.",
+  ],
+  facebook: [
+    "You send a quote, get busy on the next job, and the follow-up slips. A simple ownership step can stop good opportunities disappearing into the week.",
+    "If admin feels heavier every month, sketch the process on paper first. Mark every wait, handoff, and repeated entry before deciding what to automate.",
+    "A useful automation demo should make the process visible, not hide it behind buzzwords. Compare the manual steps with the proposed flow and ask what actually changes.",
+    "When quoting lives in one app and customer updates in another, the team ends up joining the dots manually. The better system follows the real workflow.",
+    "Paying for several tools does not guarantee a connected process. It can be worth checking which subscriptions overlap and where the gaps still sit.",
+  ],
+  twitter: [
+    "A missed quote follow-up is a workflow leak, not just forgotten admin. Make ownership and timing explicit.",
+    "Do not automate a messy process first. Map the handoffs, waits and repeated entries, then remove what should not exist.",
+    "Good automation is inspectable: show the manual flow, show the proposed flow, then compare what actually changes.",
+    "Software should follow the operating workflow. Quoting, updates and follow-up should not require staff to stitch systems together.",
+    "Before adding another subscription, map the full workflow. Consolidation may solve more than another disconnected tool.",
+  ],
+};
 const visualPrompts = [
   "barista serving a customer in a warm cafe",
   "close-up of fresh coffee beans on a roastery table",
@@ -35,9 +58,9 @@ function makeCampaign(platforms: string[] = ["instagram"]): GeneratedCampaign {
       theme: `theme-${conceptIndex + 1}`,
       assets: platforms.map((platform) => ({
         platform,
-        caption: `${platform}: ${conceptCaptions[conceptIndex]}`,
-        hashtags: ["coffee"],
-        cta: `CTA ${conceptIndex + 1}`,
+        caption: platformCaptions[platform]?.[conceptIndex] ?? `Angle ${conceptIndex + 1} for ${platform}`,
+        hashtags: [`coffee-${platform}-${conceptIndex + 1}`],
+        cta: `${platform} CTA ${conceptIndex + 1}`,
         imagePrompt: visualPrompts[conceptIndex],
       })),
     })),
@@ -193,6 +216,57 @@ describe("validateCampaignQuality", () => {
     const result = validateCampaignQuality(campaign, dna, "goal", ["instagram"]);
     expect(result.issues.some((issue) => issue.code === "concept_similarity")).toBe(true);
   });
+  it("does not treat a negated guarantee statement as an invented offer", () => {
+    const campaign = makeCampaign();
+    campaign.concepts[4].assets[0].caption =
+      "Paying for several tools does not guarantee a connected process.";
+    const result = validateCampaignQuality(campaign, dna, "goal", ["instagram"]);
+    expect(result.issues.some((issue) => issue.code === "unsupported_offer")).toBe(false);
+  });
+
+  it("limits question-style opening hooks across the campaign", () => {
+    const campaign = makeCampaign(["instagram"]);
+    campaign.concepts.slice(0, 3).forEach((concept, index) => {
+      concept.assets[0].caption = `Is admin issue ${index + 1} slowing the team? Fix the workflow before adding tools.`;
+    });
+    const result = validateCampaignQuality(campaign, dna, "goal", ["instagram"]);
+    expect(result.issues.some((issue) => issue.code === "question_hook_overuse")).toBe(true);
+  });
+
+  it("rejects repeated CTA wording more than twice", () => {
+    const campaign = makeCampaign(["instagram"]);
+    campaign.concepts.slice(0, 3).forEach((concept) => {
+      concept.assets[0].cta = "Tell us what is slowing you down";
+    });
+    const result = validateCampaignQuality(campaign, dna, "goal", ["instagram"]);
+    expect(result.issues.some((issue) => issue.code === "repeated_cta")).toBe(true);
+  });
+
+  it("rejects identical non-empty hashtag sets across assets", () => {
+    const campaign = makeCampaign(["instagram"]);
+    campaign.concepts[0].assets[0].hashtags = ["automation", "workflow"];
+    campaign.concepts[1].assets[0].hashtags = ["workflow", "automation"];
+    const result = validateCampaignQuality(campaign, dna, "goal", ["instagram"]);
+    expect(result.issues.some((issue) => issue.code === "repeated_hashtag_set")).toBe(true);
+  });
+
+  it("rejects near-duplicate copy across platforms within one concept", () => {
+    const campaign = makeCampaign(["instagram", "linkedin"]);
+    campaign.concepts[0].assets[0].caption =
+      "Manual quote follow ups create workflow delays and lost opportunities for busy service teams.";
+    campaign.concepts[0].assets[1].caption =
+      "Manual quote follow ups create workflow delays and lost opportunities across busy service teams.";
+    const result = validateCampaignQuality(campaign, dna, "goal", ["instagram", "linkedin"]);
+    expect(result.issues.some((issue) => issue.code === "cross_platform_similarity")).toBe(true);
+  });
+
+  it("enforces platform hashtag limits", () => {
+    const campaign = makeCampaign(["twitter"]);
+    campaign.concepts[0].assets[0].hashtags = ["one", "two", "three"];
+    const result = validateCampaignQuality(campaign, dna, "goal", ["twitter"]);
+    expect(result.issues.some((issue) => issue.code === "platform_style")).toBe(true);
+  });
+
   it("rejects campaigns dominated by dashboard and device imagery", () => {
     const campaign = makeCampaign();
     campaign.concepts.forEach((concept, index) => {

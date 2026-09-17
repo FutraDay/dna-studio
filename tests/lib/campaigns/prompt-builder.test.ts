@@ -124,6 +124,16 @@ describe("buildCampaignPrompt", () => {
     expect(prompt).toContain("Twitter: under 280 characters");
   });
 
+  it("directs each platform as a distinct editorial product", () => {
+    const prompt = buildCampaignPrompt(dna, "goal", ["instagram", "linkedin", "facebook", "twitter"]);
+    expect(prompt).toContain("PLATFORM CONTENT DIRECTOR RULES");
+    expect(prompt).toContain("Do not paraphrase the same caption four times");
+    expect(prompt).toContain("no more than 2 question-style opening hooks");
+    expect(prompt).toContain("materially different in wording and structure");
+    expect(prompt).toContain("no more than 3 hashtags");
+    expect(prompt).toContain("no more than 2 hashtags");
+  });
+
   it("forces visual variety and prevents fake product screenshots", () => {
     const prompt = buildCampaignPrompt(dna, "goal", ["instagram"]);
     expect(prompt).toContain("materially different visual treatments");
