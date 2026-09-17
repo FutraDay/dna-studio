@@ -153,7 +153,7 @@ describe("POST /api/campaigns/generate", () => {
         {
           platform: "instagram",
           caption: CAPTIONS[index],
-          hashtags: ["coffee"],
+          hashtags: [`coffee-${index + 1}`],
           imagePrompt: [
             "barista serving a customer",
             "coffee beans on a roastery table",
@@ -314,15 +314,15 @@ describe("POST /api/campaigns/generate", () => {
     expect(campaign.create).toHaveBeenCalled();
   });
 
-  it("saves after repair when only non-blocking style warnings remain", async () => {
-    const softInvalid = JSON.parse(JSON.stringify(CONCEPTS));
-    softInvalid.concepts.slice(0, 3).forEach((concept: { assets: Array<{ caption: string }> }, index: number) => {
+  it("repairs editorial quality warnings before saving", async () => {
+    const editorialInvalid = JSON.parse(JSON.stringify(CONCEPTS));
+    editorialInvalid.concepts.slice(0, 3).forEach((concept: { assets: Array<{ caption: string }> }, index: number) => {
       concept.assets[0].caption = `Discover how your workflow improves with angle ${index + 1}.`;
     });
     stream.mockImplementation(async function* () {
-      yield JSON.stringify(softInvalid);
+      yield JSON.stringify(editorialInvalid);
     } as never);
-    repair.mockResolvedValue(softInvalid as never);
+    repair.mockResolvedValue(CONCEPTS as never);
 
     const events = await readEvents(await generate(post("/api/campaigns/generate", validBody)));
 
@@ -344,6 +344,7 @@ describe("POST /api/campaigns/generate", () => {
     expect(events.at(-1)).toMatchObject({ type: "error" });
     expect(events.at(-1).message).toContain("Campaign quality check failed");
     expect(events.at(-1).message).toContain("unverified company");
+    expect(repair).toHaveBeenCalledTimes(3);
     expect(campaign.create).not.toHaveBeenCalled();
   });
   it("reports an error event when the model returns no JSON", async () => {

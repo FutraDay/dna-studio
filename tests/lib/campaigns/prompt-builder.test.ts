@@ -134,6 +134,15 @@ describe("buildCampaignPrompt", () => {
     expect(prompt).toContain("no more than 2 hashtags");
   });
 
+  it("assigns distinct content jobs and bans templated openings", () => {
+    const prompt = buildCampaignPrompt(dna, "goal", ["instagram", "linkedin", "facebook", "twitter"]);
+    expect(prompt).toContain("concrete day-in-the-life pain scenario");
+    expect(prompt).toContain("inline 3-step checklist");
+    expect(prompt).toContain("product demonstration grounded in verified facts");
+    expect(prompt).toContain("comparison/decision framing");
+    expect(prompt).toContain("Avoid templated openings entirely");
+  });
+
   it("forces visual variety and prevents fake product screenshots", () => {
     const prompt = buildCampaignPrompt(dna, "goal", ["instagram"]);
     expect(prompt).toContain("materially different visual treatments");

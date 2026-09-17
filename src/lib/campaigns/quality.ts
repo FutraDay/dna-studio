@@ -40,6 +40,19 @@ const CLICHES = [
   "unlock the power",
   "making your head spin",
   "pain into gains",
+  "automation isn't just a buzzword",
+  "automation is not just a buzzword",
+  "business necessity",
+  "it's time for a change",
+  "it is time for a change",
+  "think again",
+  "why settle for",
+  "curious about",
+  "worried about",
+  "thinking about",
+  "ever wondered",
+  "ready to",
+  "tired of",
 ];
 
 const VISUAL_DEVICE_TERMS = /\b(?:dashboard|laptop|monitor|screen|device|interface|chart)\b/i;

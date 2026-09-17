@@ -68,9 +68,19 @@ export async function POST(request: Request) {
             "unsupported_evidence_claim",
             "unsupported_offer",
             "unsupported_resource",
+            "duplicate_caption",
+            "repeated_hook",
+            "question_hook_overuse",
+            "repeated_cta",
+            "repeated_hashtag_set",
+            "cross_platform_similarity",
+            "platform_style",
+            "generic_cliche",
+            "concept_similarity",
+            "repetitive_visuals",
           ]);
 
-          while (!quality.passed && repairAttempts < 2) {
+          while (!quality.passed && repairAttempts < 3) {
             generated = await repairCampaign(
               dna,
               goal,
@@ -82,8 +92,7 @@ export async function POST(request: Request) {
             repairAttempts += 1;
             quality = validateCampaignQuality(generated, dna, goal, platforms);
 
-            // Once factual/structural integrity is clean, do not fail the whole
-            // campaign solely because a softer style/diversity heuristic remains.
+            // Continue repairing while any configured blocking quality issue remains.
             const remainingBlocking = quality.issues.filter((issue) =>
               blockingCodes.has(issue.code)
             );

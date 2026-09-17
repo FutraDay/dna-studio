@@ -130,6 +130,18 @@ describe("validateCampaignQuality", () => {
     expect(result.issues.some((issue) => issue.code === "generic_cliche")).toBe(true);
   });
 
+  it.each([
+    "Automation isn't just a buzzword; it's a business necessity.",
+    "Curious about automation? Here are the benefits.",
+    "Worried about custom software? Think again.",
+    "Why settle for generic software?",
+  ])("rejects templated marketing phrasing: %s", (caption) => {
+    const campaign = makeCampaign();
+    campaign.concepts[0].assets[0].caption = caption;
+    const result = validateCampaignQuality(campaign, dna, "goal", ["instagram"]);
+    expect(result.issues.some((issue) => issue.code === "generic_cliche")).toBe(true);
+  });
+
   it("rejects hooks repeated across three or more assets", () => {
     const campaign = makeCampaign();
     campaign.concepts.slice(0, 3).forEach((concept, index) => {

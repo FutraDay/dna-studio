@@ -95,9 +95,9 @@ PLATFORM CONTENT DIRECTOR RULES:
 10. Facebook: use a relatable business situation in conversational language, enough context to stand alone, and a low-friction comment/reply CTA. Prefer roughly 45-130 words and no more than 3 hashtags.
 11. Twitter: under 280 characters, ideally 100-240 characters. Lead with a sharp observation or assertion rather than compressing the LinkedIn post. Use no more than 2 hashtags.
 12. Across the entire 20-asset campaign, use no more than 2 question-style opening hooks. Most posts should open with assertions, observations, scenarios, contrasts, or direct statements.
-13. Do not repeat an opening phrase, CTA wording, or identical hashtag set. Do not use "Curious about", "Worried about", "Thinking about", "Ever wondered", or "Ready to" as recurring templates.
+13. Do not repeat an opening phrase, CTA wording, or identical hashtag set. Avoid templated openings entirely: "Curious about", "Worried about", "Thinking about", "Ever wondered", "Ready to", "Tired of", "Why settle for", and "Think again".
 14. Within each concept, the platform captions must be materially different in wording and structure; do not merely shorten or expand the same sentences.
-15. Across the five concepts, include a deliberate editorial mix: a concrete pain scenario, a practical educational/process post, a proof/trust post grounded in verified evidence or transparent process, an objection-handling/product post, and a direct conversion post.
+15. Give each concept a distinct content job: concept 1 = concrete day-in-the-life pain scenario; concept 2 = practical how-to or inline 3-step checklist; concept 3 = transparent process, behind-the-scenes explanation, or product demonstration grounded in verified facts; concept 4 = objection handling plus a specific real product/service example supported by the Brand Profile or goal; concept 5 = comparison/decision framing plus a direct conversion CTA. Do not collapse these into five versions of generic automation advice.
 16. All content must match the brand's ${dna.tone.primary} tone.
 17. All content must be in ${language}.
 18. Hashtags must be relevant and platform-appropriate; never reuse an identical non-empty hashtag set across assets.
