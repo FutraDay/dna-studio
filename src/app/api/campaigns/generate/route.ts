@@ -55,7 +55,22 @@ export async function POST(request: Request) {
           if (!match) throw new Error("LLM did not return valid JSON for campaign");
           let generated = JSON.parse(match[0]) as GeneratedCampaign;
           let quality = validateCampaignQuality(generated, dna, goal, platforms);
-          if (!quality.passed) {
+          let repairAttempts = 0;
+
+          const blockingCodes = new Set([
+            "concept_count",
+            "platform_coverage",
+            "strategy_coverage",
+            "invalid_asset",
+            "twitter_length",
+            "unsupported_metric",
+            "unsupported_entity",
+            "unsupported_evidence_claim",
+            "unsupported_offer",
+            "unsupported_resource",
+          ]);
+
+          while (!quality.passed && repairAttempts < 2) {
             generated = await repairCampaign(
               dna,
               goal,
@@ -64,10 +79,31 @@ export async function POST(request: Request) {
               generated,
               quality.issues
             );
+            repairAttempts += 1;
             quality = validateCampaignQuality(generated, dna, goal, platforms);
-            if (!quality.passed) {
-              throw new Error(formatCampaignQualityError(quality));
+
+            // Once factual/structural integrity is clean, do not fail the whole
+            // campaign solely because a softer style/diversity heuristic remains.
+            const remainingBlocking = quality.issues.filter((issue) =>
+              blockingCodes.has(issue.code)
+            );
+            if (!quality.passed && remainingBlocking.length === 0) break;
+          }
+
+          if (!quality.passed) {
+            const blockingIssues = quality.issues.filter((issue) =>
+              blockingCodes.has(issue.code)
+            );
+            if (blockingIssues.length > 0) {
+              throw new Error(
+                formatCampaignQualityError({ passed: false, issues: blockingIssues })
+              );
             }
+
+            console.warn(
+              "Campaign saved with non-blocking quality warnings:",
+              quality.issues.map((issue) => issue.message)
+            );
           }
 
           const campaign = await prisma.campaign.create({

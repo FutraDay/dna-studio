@@ -190,7 +190,8 @@ function NewCampaignContent() {
       const msg = err instanceof Error ? err.message : "Generation failed";
       console.error("Generation failed:", msg);
       setError(msg);
-      setGenerating(false);
+      // Keep the generation view mounted so the user can see the actual error.
+      setGenerating(true);
     }
   }, [brandId, goal, selectedPlatforms, language, referenceImage, router]);
 

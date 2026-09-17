@@ -297,6 +297,40 @@ describe("POST /api/campaigns/generate", () => {
     expect(campaign.create).toHaveBeenCalled();
   });
 
+  it("retries repair when a blocking integrity issue remains", async () => {
+    const invalid = JSON.parse(JSON.stringify(CONCEPTS));
+    invalid.concepts[0].assets[0].caption = "See how XYZ Co. boosted efficiency with automation.";
+    stream.mockImplementation(async function* () {
+      yield JSON.stringify(invalid);
+    } as never);
+    repair
+      .mockResolvedValueOnce(invalid as never)
+      .mockResolvedValueOnce(CONCEPTS as never);
+
+    const events = await readEvents(await generate(post("/api/campaigns/generate", validBody)));
+
+    expect(repair).toHaveBeenCalledTimes(2);
+    expect(events.at(-1)).toMatchObject({ type: "complete" });
+    expect(campaign.create).toHaveBeenCalled();
+  });
+
+  it("saves after repair when only non-blocking style warnings remain", async () => {
+    const softInvalid = JSON.parse(JSON.stringify(CONCEPTS));
+    softInvalid.concepts.slice(0, 3).forEach((concept: { assets: Array<{ caption: string }> }, index: number) => {
+      concept.assets[0].caption = `Discover how your workflow improves with angle ${index + 1}.`;
+    });
+    stream.mockImplementation(async function* () {
+      yield JSON.stringify(softInvalid);
+    } as never);
+    repair.mockResolvedValue(softInvalid as never);
+
+    const events = await readEvents(await generate(post("/api/campaigns/generate", validBody)));
+
+    expect(repair).toHaveBeenCalledTimes(1);
+    expect(events.at(-1)).toMatchObject({ type: "complete" });
+    expect(campaign.create).toHaveBeenCalled();
+  });
+
   it("rejects a campaign when the repair still fails quality checks", async () => {
     const invalid = JSON.parse(JSON.stringify(CONCEPTS));
     invalid.concepts[0].assets[0].caption = "See how XYZ Co. boosted efficiency with automation.";
