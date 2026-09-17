@@ -93,6 +93,30 @@ describe("buildCampaignPrompt", () => {
     expect(prompt).toContain('"imagePrompt"');
     expect(prompt).toContain("Generate exactly 5 campaign concepts");
   });
+
+  it("forces five distinct strategic roles instead of duplicate angles", () => {
+    const prompt = buildCampaignPrompt(dna, "goal", ["instagram"]);
+    expect(prompt).toContain("Problem awareness");
+    expect(prompt).toContain("Education");
+    expect(prompt).toContain("Proof and trust");
+    expect(prompt).toContain("Solution and product");
+    expect(prompt).toContain("Conversion");
+    expect(prompt).toContain("Do not reuse the same opening hook");
+  });
+
+  it("requires genuine platform adaptation", () => {
+    const prompt = buildCampaignPrompt(dna, "goal", ["instagram", "linkedin"]);
+    expect(prompt).toContain("genuinely platform-specific content");
+    expect(prompt).toContain("Do not write like an Instagram caption");
+    expect(prompt).toContain("Twitter: under 280 characters");
+  });
+
+  it("forces visual variety and prevents fake product screenshots", () => {
+    const prompt = buildCampaignPrompt(dna, "goal", ["instagram"]);
+    expect(prompt).toContain("materially different visual treatments");
+    expect(prompt).toContain("Do not make every visual a laptop, dashboard, device mockup");
+    expect(prompt).toContain("Do NOT invent fake product screenshots");
+  });
 });
 
 describe("buildImagePrompt", () => {
