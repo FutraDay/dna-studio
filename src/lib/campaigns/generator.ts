@@ -68,3 +68,44 @@ export async function* streamCampaign(
     json: true,
   });
 }
+
+export async function repairCampaign(
+  dna: BrandDNA,
+  goal: string,
+  platforms: string[],
+  language: string,
+  candidate: GeneratedCampaign,
+  issues: Array<{ message: string }>
+): Promise<GeneratedCampaign> {
+  const basePrompt = buildCampaignPrompt(dna, goal, platforms, language);
+  const issueSummary = issues.map((issue, index) => `${index + 1}. ${issue.message}`).join("\n");
+  const repairPrompt = `${basePrompt}
+
+QUALITY REPAIR TASK:
+The previous campaign failed deterministic quality checks. Repair it before it can be saved or sent to image generation.
+
+FAILED CHECKS:
+${issueSummary}
+
+PREVIOUS CAMPAIGN JSON:
+${JSON.stringify(candidate, null, 2)}
+
+Return a complete corrected campaign in the exact JSON structure requested above.
+Preserve compliant ideas where possible, but fix every listed issue.
+Do not explain the changes outside the JSON.`;
+
+  const messages: LLMMessage[] = [
+    {
+      role: "system",
+      content:
+        "You are a strict senior B2B content editor. Repair campaign JSON to satisfy every supplied quality check without inventing evidence.",
+    },
+    { role: "user", content: repairPrompt },
+  ];
+
+  return generateJSON<GeneratedCampaign>(messages, {
+    maxTokens: 8192,
+    temperature: 0.3,
+    json: true,
+  });
+}

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/llm/client", () => ({ generateJSON: vi.fn(), streamText: vi.fn() }));
 
 import { generateJSON, streamText } from "@/lib/llm/client";
-import { generateCampaign, streamCampaign } from "@/lib/campaigns/generator";
+import { generateCampaign, repairCampaign, streamCampaign } from "@/lib/campaigns/generator";
 import { buildCampaignPrompt } from "@/lib/campaigns/prompt-builder";
 import { makeBrandDNA } from "../../fixtures/brand-dna";
 
@@ -75,6 +75,45 @@ describe("streamCampaign", () => {
     expect(stream).toHaveBeenCalledWith(expect.anything(), {
       maxTokens: 8192,
       temperature: 0.8,
+      json: true,
+    });
+  });
+});
+
+describe("repairCampaign", () => {
+  it("asks the model to fix deterministic quality failures", async () => {
+    json.mockResolvedValue({ concepts: [] } as never);
+
+    await repairCampaign(
+      dna,
+      "Launch cold brew",
+      ["instagram", "linkedin"],
+      "English",
+      { concepts: [] },
+      [
+        { message: "Expected exactly 5 campaign concepts but received 2." },
+        { message: "Concept 1 references unverified company XYZ Co." },
+      ]
+    );
+
+    const messages = json.mock.calls.at(-1)?.[0] as { role: string; content: string }[];
+    expect(messages[0].content).toContain("strict senior B2B content editor");
+    expect(messages[1].content).toContain("QUALITY REPAIR TASK");
+    expect(messages[1].content).toContain("Expected exactly 5 campaign concepts");
+    expect(messages[1].content).toContain("XYZ Co.");
+    expect(messages[1].content).toContain('"concepts": []');
+  });
+
+  it("uses a lower temperature for repair work", async () => {
+    json.mockResolvedValue({ concepts: [] } as never);
+
+    await repairCampaign(dna, "goal", ["instagram"], "English", { concepts: [] }, [
+      { message: "fix it" },
+    ]);
+
+    expect(json).toHaveBeenLastCalledWith(expect.anything(), {
+      maxTokens: 8192,
+      temperature: 0.3,
       json: true,
     });
   });

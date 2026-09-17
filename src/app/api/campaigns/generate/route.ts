@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { requireSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
-import { streamCampaign, type GeneratedCampaign } from "@/lib/campaigns/generator";
+import { repairCampaign, streamCampaign, type GeneratedCampaign } from "@/lib/campaigns/generator";
 import { formatCampaignQualityError, validateCampaignQuality } from "@/lib/campaigns/quality";
 import type { BrandDNA } from "@/lib/brand-dna/types";
 
@@ -53,10 +53,21 @@ export async function POST(request: Request) {
           // Parse the completed content and save
           const match = fullContent.match(/\{[\s\S]*\}/);
           if (!match) throw new Error("LLM did not return valid JSON for campaign");
-          const generated = JSON.parse(match[0]) as GeneratedCampaign;
-          const quality = validateCampaignQuality(generated, dna, goal, platforms);
+          let generated = JSON.parse(match[0]) as GeneratedCampaign;
+          let quality = validateCampaignQuality(generated, dna, goal, platforms);
           if (!quality.passed) {
-            throw new Error(formatCampaignQualityError(quality));
+            generated = await repairCampaign(
+              dna,
+              goal,
+              platforms,
+              language,
+              generated,
+              quality.issues
+            );
+            quality = validateCampaignQuality(generated, dna, goal, platforms);
+            if (!quality.passed) {
+              throw new Error(formatCampaignQualityError(quality));
+            }
           }
 
           const campaign = await prisma.campaign.create({

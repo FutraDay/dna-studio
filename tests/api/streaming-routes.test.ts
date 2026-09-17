@@ -6,12 +6,12 @@ vi.mock("@/lib/db", () => {
 });
 vi.mock("@/lib/auth/session", () => ({ requireSession: vi.fn(), getSession: vi.fn() }));
 vi.mock("@/lib/brand-dna/crawler", () => ({ crawlBrandDNA: vi.fn() }));
-vi.mock("@/lib/campaigns/generator", () => ({ streamCampaign: vi.fn() }));
+vi.mock("@/lib/campaigns/generator", () => ({ streamCampaign: vi.fn(), repairCampaign: vi.fn() }));
 
 import { prisma } from "@/lib/db";
 import { requireSession } from "@/lib/auth/session";
 import { crawlBrandDNA } from "@/lib/brand-dna/crawler";
-import { streamCampaign } from "@/lib/campaigns/generator";
+import { repairCampaign, streamCampaign } from "@/lib/campaigns/generator";
 import { POST as analyze } from "@/app/api/brands/analyze/route";
 import { POST as generate } from "@/app/api/campaigns/generate/route";
 import { makeBrandDNA } from "../fixtures/brand-dna";
@@ -21,6 +21,7 @@ const campaign = vi.mocked(prisma.campaign);
 const session = vi.mocked(requireSession);
 const crawl = vi.mocked(crawlBrandDNA);
 const stream = vi.mocked(streamCampaign);
+const repair = vi.mocked(repairCampaign);
 
 const post = (url: string, body: unknown) =>
   new Request(`http://localhost${url}`, { method: "POST", body: JSON.stringify(body) });
@@ -156,6 +157,7 @@ describe("POST /api/campaigns/generate", () => {
     stream.mockImplementation(async function* () {
       yield JSON.stringify(CONCEPTS);
     } as never);
+    repair.mockResolvedValue(CONCEPTS as never);
   });
 
   it.each([
@@ -235,20 +237,28 @@ describe("POST /api/campaigns/generate", () => {
     };
     expect(created.data.assets.create[0].imagePrompt).toBeNull();
   });
-  it("rejects incomplete campaign coverage before saving", async () => {
+  it("repairs incomplete campaign coverage before saving", async () => {
+    const incomplete = { concepts: CONCEPTS.concepts.slice(0, 2) };
     stream.mockImplementation(async function* () {
-      yield JSON.stringify({ concepts: CONCEPTS.concepts.slice(0, 2) });
+      yield JSON.stringify(incomplete);
     } as never);
 
     const events = await readEvents(await generate(post("/api/campaigns/generate", validBody)));
 
-    expect(events.at(-1)).toMatchObject({ type: "error" });
-    expect(events.at(-1).message).toContain("Campaign quality check failed");
-    expect(events.at(-1).message).toContain("Expected exactly 5 campaign concepts");
-    expect(campaign.create).not.toHaveBeenCalled();
+    expect(repair).toHaveBeenCalledWith(
+      expect.anything(),
+      "Launch cold brew",
+      ["instagram"],
+      "English",
+      incomplete,
+      expect.arrayContaining([
+        expect.objectContaining({ code: "concept_count" }),
+      ])
+    );
+    expect(events.at(-1)).toMatchObject({ type: "complete" });
+    expect(campaign.create).toHaveBeenCalled();
   });
-
-  it("rejects fabricated company evidence before saving", async () => {
+  it("repairs fabricated company evidence before saving", async () => {
     const invalid = JSON.parse(JSON.stringify(CONCEPTS));
     invalid.concepts[0].assets[0].caption = "See how XYZ Co. boosted efficiency with automation.";
     stream.mockImplementation(async function* () {
@@ -257,7 +267,32 @@ describe("POST /api/campaigns/generate", () => {
 
     const events = await readEvents(await generate(post("/api/campaigns/generate", validBody)));
 
+    expect(repair).toHaveBeenCalledWith(
+      expect.anything(),
+      "Launch cold brew",
+      ["instagram"],
+      "English",
+      invalid,
+      expect.arrayContaining([
+        expect.objectContaining({ code: "unsupported_entity" }),
+      ])
+    );
+    expect(events.at(-1)).toMatchObject({ type: "complete" });
+    expect(campaign.create).toHaveBeenCalled();
+  });
+
+  it("rejects a campaign when the repair still fails quality checks", async () => {
+    const invalid = JSON.parse(JSON.stringify(CONCEPTS));
+    invalid.concepts[0].assets[0].caption = "See how XYZ Co. boosted efficiency with automation.";
+    stream.mockImplementation(async function* () {
+      yield JSON.stringify(invalid);
+    } as never);
+    repair.mockResolvedValue(invalid as never);
+
+    const events = await readEvents(await generate(post("/api/campaigns/generate", validBody)));
+
     expect(events.at(-1)).toMatchObject({ type: "error" });
+    expect(events.at(-1).message).toContain("Campaign quality check failed");
     expect(events.at(-1).message).toContain("unverified company");
     expect(campaign.create).not.toHaveBeenCalled();
   });
