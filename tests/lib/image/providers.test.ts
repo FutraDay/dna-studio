@@ -30,7 +30,7 @@ import { GeminiImageProvider } from "@/lib/image/providers/gemini";
 
 describe("OpenAIImageProvider", () => {
   beforeEach(() => {
-    imagesGenerate.mockResolvedValue({ data: [{ url: "https://img/1.png" }] });
+    imagesGenerate.mockResolvedValue({ data: [{ b64_json: "BASE64PNG" }] });
   });
 
   it("passes the key to the SDK and falls back to the environment", () => {
@@ -42,33 +42,42 @@ describe("OpenAIImageProvider", () => {
     expect(openAICtor).toHaveBeenLastCalledWith({ apiKey: "sk-env" });
   });
 
-  it("asks DALL-E 3 for a single standard-quality image", async () => {
+  it("asks GPT Image 2 for a single medium-quality PNG", async () => {
     await new OpenAIImageProvider("sk").generate("a mug");
 
     expect(imagesGenerate).toHaveBeenCalledWith({
-      model: "dall-e-3",
+      model: "gpt-image-2",
       prompt: "a mug",
       n: 1,
       size: "1024x1024",
-      quality: "standard",
+      quality: "medium",
+      output_format: "png",
     });
   });
 
-  it("passes the requested size through", async () => {
-    await new OpenAIImageProvider("sk").generate("a mug", { size: "1792x1024" });
-    expect(imagesGenerate).toHaveBeenCalledWith(expect.objectContaining({ size: "1792x1024" }));
+  it("maps legacy landscape and portrait sizes to GPT Image sizes", async () => {
+    const provider = new OpenAIImageProvider("sk");
+    await provider.generate("landscape", { size: "1792x1024" });
+    expect(imagesGenerate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ size: "1536x1024" })
+    );
+
+    await provider.generate("portrait", { size: "1024x1792" });
+    expect(imagesGenerate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ size: "1024x1536" })
+    );
   });
 
-  it("returns the generated URL", async () => {
+  it("returns the generated base64 payload as a data URL", async () => {
     await expect(new OpenAIImageProvider("sk").generate("a mug")).resolves.toEqual({
-      url: "https://img/1.png",
+      url: "data:image/png;base64,BASE64PNG",
     });
   });
 
-  it("throws when the API returns no image", async () => {
+  it("throws when the API returns no image data", async () => {
     imagesGenerate.mockResolvedValue({ data: [] });
     await expect(new OpenAIImageProvider("sk").generate("a mug")).rejects.toThrow(
-      "No image URL returned from DALL-E"
+      "OpenAI did not return image data."
     );
   });
 });
