@@ -142,6 +142,8 @@ export function AssetCard({
             {asset.status === "draft" && (
               <div className="relative">
                 <button
+                  type="button"
+                  aria-label="Post actions"
                   onClick={() => setShowMenu(!showMenu)}
                   className="p-1 rounded hover:bg-background/40 transition-colors cursor-pointer"
                 >
