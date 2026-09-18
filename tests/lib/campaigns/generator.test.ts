@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+﻿import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/llm/client", () => ({ generateJSON: vi.fn(), streamText: vi.fn() }));
 
@@ -44,6 +44,7 @@ describe("generateCampaign", () => {
     await generateCampaign(dna, "goal", ["instagram"]);
     expect(json).toHaveBeenCalledWith(expect.anything(), {
       maxTokens: 8192,
+      contextTokens: 8192,
       temperature: 0.8,
       json: true,
     });
@@ -74,6 +75,7 @@ describe("streamCampaign", () => {
 
     expect(stream).toHaveBeenCalledWith(expect.anything(), {
       maxTokens: 8192,
+      contextTokens: 8192,
       temperature: 0.8,
       json: true,
     });
@@ -119,6 +121,7 @@ describe("repairCampaign", () => {
     expect(messages[1].content).toContain("Every asset must have a distinct opening phrase");
     expect(json).toHaveBeenLastCalledWith(expect.anything(), {
       maxTokens: 8192,
+      contextTokens: 8192,
       temperature: 0.1,
       json: true,
     });
@@ -133,6 +136,7 @@ describe("repairCampaign", () => {
 
     expect(json).toHaveBeenLastCalledWith(expect.anything(), {
       maxTokens: 8192,
+      contextTokens: 8192,
       temperature: 0.3,
       json: true,
     });

@@ -27,6 +27,7 @@ export interface LLMProvider {
 export interface LLMOptions {
   temperature?: number;
   maxTokens?: number;
+  contextTokens?: number;
   json?: boolean;
 }
 

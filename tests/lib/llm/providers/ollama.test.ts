@@ -3,8 +3,6 @@ import { OllamaProvider } from "@/lib/llm/providers/ollama";
 
 const fetchMock = vi.fn();
 
-const jsonResponse = (body: unknown) => ({ json: async () => body });
-
 const streamResponse = (lines: string[]) => {
   const encoder = new TextEncoder();
   let i = 0;
@@ -22,7 +20,9 @@ const streamResponse = (lines: string[]) => {
 
 beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
-  fetchMock.mockResolvedValue(jsonResponse({ message: { content: "hello" } }));
+  fetchMock.mockResolvedValue(
+    streamResponse(['{"message":{"content":"hello"},"done":true}\n'])
+  );
 });
 
 const bodyOf = (call = 0) => JSON.parse(fetchMock.mock.calls[call][1].body);
@@ -61,14 +61,17 @@ describe("OllamaProvider", () => {
   });
 
   it("returns an empty string when ollama sends no message", async () => {
-    fetchMock.mockResolvedValue(jsonResponse({}));
+    fetchMock.mockResolvedValue(streamResponse(['{"done":true}\n']));
     const result = await new OllamaProvider().generate([{ role: "user", content: "hi" }]);
     expect(result.content).toBe("");
   });
 
   it("maps eval counts to token usage", async () => {
     fetchMock.mockResolvedValue(
-      jsonResponse({ message: { content: "hi" }, eval_count: 7, prompt_eval_count: 3 })
+      streamResponse([
+        '{"message":{"content":"hi"},"done":false}\n',
+        '{"done":true,"eval_count":7,"prompt_eval_count":3}\n',
+      ])
     );
     const result = await new OllamaProvider().generate([{ role: "user", content: "hi" }]);
     expect(result.usage).toEqual({ promptTokens: 3, completionTokens: 7 });
@@ -79,17 +82,22 @@ describe("OllamaProvider", () => {
     expect(result.usage).toBeUndefined();
   });
 
-  it("does not stream for a plain generate call", async () => {
+  it("streams internally for a plain generate call to avoid long-response header timeouts", async () => {
     await new OllamaProvider().generate([{ role: "user", content: "hi" }]);
-    expect(bodyOf().stream).toBe(false);
+    expect(bodyOf().stream).toBe(true);
   });
 
   it("maps options onto ollama's option names", async () => {
     await new OllamaProvider().generate([{ role: "user", content: "hi" }], {
       temperature: 0.2,
       maxTokens: 256,
+      contextTokens: 16384,
     });
-    expect(bodyOf().options).toEqual({ temperature: 0.2, num_predict: 256 });
+    expect(bodyOf().options).toEqual({
+      temperature: 0.2,
+      num_predict: 256,
+      num_ctx: 16384,
+    });
   });
 
   it("asks for JSON format only when requested", async () => {
@@ -98,6 +106,21 @@ describe("OllamaProvider", () => {
 
     await new OllamaProvider().generate([{ role: "user", content: "hi" }], { json: true });
     expect(bodyOf(1).format).toBe("json");
+  });
+
+  it("reassembles streamed generate output and usage across reads", async () => {
+    fetchMock.mockResolvedValue(
+      streamResponse([
+        '{"message":{"content":"Hel',
+        'lo"},"done":false}\n{"message":{"content":"!"},"done":true,"eval_count":9,"prompt_eval_count":4}\n',
+      ])
+    );
+
+    const result = await new OllamaProvider().generate([{ role: "user", content: "hi" }]);
+    expect(result).toEqual({
+      content: "Hello!",
+      usage: { promptTokens: 4, completionTokens: 9 },
+    });
   });
 
   it("yields each streamed line", async () => {

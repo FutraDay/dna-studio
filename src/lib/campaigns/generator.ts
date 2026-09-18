@@ -1,6 +1,6 @@
 import type { BrandDNA } from "../brand-dna/types";
 import { generateJSON, streamText, type LLMMessage } from "../llm/client";
-import { buildCampaignPrompt } from "./prompt-builder";
+import { buildBrandContext, buildCampaignPrompt } from "./prompt-builder";
 
 export type CampaignStrategy = "problem_awareness" | "education" | "proof_trust" | "solution_product" | "conversion";
 
@@ -24,6 +24,9 @@ export interface GeneratedCampaign {
   concepts: CampaignConcept[];
 }
 
+const CAMPAIGN_CONTEXT_TOKENS = 8192;
+const REPAIR_CONTEXT_TOKENS = 8192;
+
 export async function generateCampaign(
   dna: BrandDNA,
   goal: string,
@@ -43,6 +46,7 @@ export async function generateCampaign(
 
   return generateJSON<GeneratedCampaign>(messages, {
     maxTokens: 8192,
+    contextTokens: CAMPAIGN_CONTEXT_TOKENS,
     temperature: 0.8,
     json: true,
   });
@@ -67,6 +71,7 @@ export async function* streamCampaign(
 
   yield* streamText(messages, {
     maxTokens: 8192,
+    contextTokens: CAMPAIGN_CONTEXT_TOKENS,
     temperature: 0.8,
     json: true,
   });
@@ -80,7 +85,7 @@ export async function repairCampaign(
   candidate: GeneratedCampaign,
   issues: Array<{ code?: string; message: string }>
 ): Promise<GeneratedCampaign> {
-  const basePrompt = buildCampaignPrompt(dna, goal, platforms, language);
+  const brandContext = buildBrandContext(dna);
   const issueSummary = issues.map((issue, index) => `${index + 1}. ${issue.message}`).join("\n");
   const styleRecoveryCodes = new Set([
     "question_hook_overuse",
@@ -108,10 +113,16 @@ STRICT STYLE RECOVERY MODE:
 - Preserve verified facts and evidence, but aggressively rewrite style where needed.
 - Before returning JSON, audit all captions against these rules.`
     : "";
-  const repairPrompt = `${basePrompt}
+  const repairPrompt = `QUALITY REPAIR TASK:
+Repair the existing campaign without rebuilding the full planning prompt.
 
-QUALITY REPAIR TASK:
-The previous campaign failed deterministic quality checks. Repair it before it can be saved or sent to image generation.
+${brandContext}
+
+CAMPAIGN GOAL: ${goal}
+TARGET PLATFORMS: ${platforms.join(", ")}
+LANGUAGE: ${language}
+
+The campaign must contain exactly 5 concepts in this strategy order: problem_awareness, education, proof_trust, solution_product, conversion. Each concept must contain exactly one asset for every target platform.
 
 FAILED CHECKS:
 ${issueSummary}${styleDirective}
@@ -119,7 +130,7 @@ ${issueSummary}${styleDirective}
 PREVIOUS CAMPAIGN JSON:
 ${JSON.stringify(candidate, null, 2)}
 
-Return a complete corrected campaign in the exact JSON structure requested above.
+Return a complete corrected campaign in the same JSON structure as PREVIOUS CAMPAIGN JSON.
 Preserve compliant ideas where possible, but fix every listed issue.
 Do not explain the changes outside the JSON.`;
 
@@ -134,6 +145,7 @@ Do not explain the changes outside the JSON.`;
 
   return generateJSON<GeneratedCampaign>(messages, {
     maxTokens: 8192,
+    contextTokens: REPAIR_CONTEXT_TOKENS,
     temperature: styleRecovery ? 0.1 : 0.3,
     json: true,
   });

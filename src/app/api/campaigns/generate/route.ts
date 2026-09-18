@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { repairCampaign, streamCampaign, type GeneratedCampaign } from "@/lib/campaigns/generator";
 import { formatCampaignQualityError, validateCampaignQuality } from "@/lib/campaigns/quality";
+import { normalizeCampaignStyle } from "@/lib/campaigns/style-normalizer";
 import type { BrandDNA } from "@/lib/brand-dna/types";
 
 const generateSchema = z.object({
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
           // Parse the completed content and save
           const match = fullContent.match(/\{[\s\S]*\}/);
           if (!match) throw new Error("LLM did not return valid JSON for campaign");
-          let generated = JSON.parse(match[0]) as GeneratedCampaign;
+          let generated = normalizeCampaignStyle(JSON.parse(match[0]) as GeneratedCampaign);
           let quality = validateCampaignQuality(generated, dna, goal, platforms);
           let repairAttempts = 0;
 
@@ -81,13 +82,15 @@ export async function POST(request: Request) {
           ]);
 
           while (!quality.passed && repairAttempts < 3) {
-            generated = await repairCampaign(
-              dna,
-              goal,
-              platforms,
-              language,
-              generated,
-              quality.issues
+            generated = normalizeCampaignStyle(
+              await repairCampaign(
+                dna,
+                goal,
+                platforms,
+                language,
+                generated,
+                quality.issues
+              )
             );
             repairAttempts += 1;
             quality = validateCampaignQuality(generated, dna, goal, platforms);
