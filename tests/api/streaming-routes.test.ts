@@ -266,7 +266,7 @@ describe("POST /api/campaigns/generate", () => {
       "Launch cold brew",
       ["instagram"],
       "English",
-      incomplete,
+      expect.objectContaining({ concepts: expect.any(Array) }),
       expect.arrayContaining([
         expect.objectContaining({ code: "concept_count" }),
       ])
@@ -274,7 +274,7 @@ describe("POST /api/campaigns/generate", () => {
     expect(events.at(-1)).toMatchObject({ type: "complete" });
     expect(campaign.create).toHaveBeenCalled();
   });
-  it("repairs fabricated company evidence before saving", async () => {
+  it("repairs fabricated company evidence deterministically before saving", async () => {
     const invalid = JSON.parse(JSON.stringify(CONCEPTS));
     invalid.concepts[0].assets[0].caption = "See how XYZ Co. boosted efficiency with automation.";
     stream.mockImplementation(async function* () {
@@ -283,23 +283,17 @@ describe("POST /api/campaigns/generate", () => {
 
     const events = await readEvents(await generate(post("/api/campaigns/generate", validBody)));
 
-    expect(repair).toHaveBeenCalledWith(
-      expect.anything(),
-      "Launch cold brew",
-      ["instagram"],
-      "English",
-      invalid,
-      expect.arrayContaining([
-        expect.objectContaining({ code: "unsupported_entity" }),
-      ])
-    );
+    expect(repair).not.toHaveBeenCalled();
     expect(events.at(-1)).toMatchObject({ type: "complete" });
     expect(campaign.create).toHaveBeenCalled();
+    const created = campaign.create.mock.calls[0][0] as unknown as {
+      data: { assets: { create: Array<{ caption: string }> } };
+    };
+    expect(created.data.assets.create[0].caption).not.toContain("XYZ Co.");
   });
 
-  it("retries repair when a blocking integrity issue remains", async () => {
-    const invalid = JSON.parse(JSON.stringify(CONCEPTS));
-    invalid.concepts[0].assets[0].caption = "See how XYZ Co. boosted efficiency with automation.";
+  it("retries repair when a structural integrity issue remains", async () => {
+    const invalid = { concepts: CONCEPTS.concepts.slice(0, 2) };
     stream.mockImplementation(async function* () {
       yield JSON.stringify(invalid);
     } as never);
@@ -314,7 +308,7 @@ describe("POST /api/campaigns/generate", () => {
     expect(campaign.create).toHaveBeenCalled();
   });
 
-  it("repairs editorial quality warnings before saving", async () => {
+  it("repairs editorial quality warnings deterministically before saving", async () => {
     const editorialInvalid = JSON.parse(JSON.stringify(CONCEPTS));
     editorialInvalid.concepts.slice(0, 3).forEach((concept: { assets: Array<{ caption: string }> }, index: number) => {
       concept.assets[0].caption = `Discover how your workflow improves with angle ${index + 1}.`;
@@ -322,18 +316,16 @@ describe("POST /api/campaigns/generate", () => {
     stream.mockImplementation(async function* () {
       yield JSON.stringify(editorialInvalid);
     } as never);
-    repair.mockResolvedValue(CONCEPTS as never);
 
     const events = await readEvents(await generate(post("/api/campaigns/generate", validBody)));
 
-    expect(repair).toHaveBeenCalledTimes(1);
+    expect(repair).not.toHaveBeenCalled();
     expect(events.at(-1)).toMatchObject({ type: "complete" });
     expect(campaign.create).toHaveBeenCalled();
   });
 
-  it("rejects a campaign when the repair still fails quality checks", async () => {
-    const invalid = JSON.parse(JSON.stringify(CONCEPTS));
-    invalid.concepts[0].assets[0].caption = "See how XYZ Co. boosted efficiency with automation.";
+  it("rejects a campaign when structural repair still fails quality checks", async () => {
+    const invalid = { concepts: CONCEPTS.concepts.slice(0, 2) };
     stream.mockImplementation(async function* () {
       yield JSON.stringify(invalid);
     } as never);
@@ -343,10 +335,11 @@ describe("POST /api/campaigns/generate", () => {
 
     expect(events.at(-1)).toMatchObject({ type: "error" });
     expect(events.at(-1).message).toContain("Campaign quality check failed");
-    expect(events.at(-1).message).toContain("unverified company");
+    expect(events.at(-1).message).toContain("Expected exactly 5 campaign concepts");
     expect(repair).toHaveBeenCalledTimes(3);
     expect(campaign.create).not.toHaveBeenCalled();
   });
+
   it("reports an error event when the model returns no JSON", async () => {
     stream.mockImplementation(async function* () {
       yield "I cannot help with that.";

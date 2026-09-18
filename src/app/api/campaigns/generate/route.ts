@@ -5,7 +5,7 @@ import { requireSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { repairCampaign, streamCampaign, type GeneratedCampaign } from "@/lib/campaigns/generator";
 import { formatCampaignQualityError, validateCampaignQuality } from "@/lib/campaigns/quality";
-import { normalizeCampaignStyle } from "@/lib/campaigns/style-normalizer";
+import { normalizeCampaignStyle, repairCampaignDeterministically } from "@/lib/campaigns/style-normalizer";
 import type { BrandDNA } from "@/lib/brand-dna/types";
 
 const generateSchema = z.object({
@@ -56,6 +56,10 @@ export async function POST(request: Request) {
           if (!match) throw new Error("LLM did not return valid JSON for campaign");
           let generated = normalizeCampaignStyle(JSON.parse(match[0]) as GeneratedCampaign);
           let quality = validateCampaignQuality(generated, dna, goal, platforms);
+          if (!quality.passed) {
+            generated = repairCampaignDeterministically(generated, quality.issues);
+            quality = validateCampaignQuality(generated, dna, goal, platforms);
+          }
           let repairAttempts = 0;
 
           const blockingCodes = new Set([
@@ -94,6 +98,10 @@ export async function POST(request: Request) {
             );
             repairAttempts += 1;
             quality = validateCampaignQuality(generated, dna, goal, platforms);
+            if (!quality.passed) {
+              generated = repairCampaignDeterministically(generated, quality.issues);
+              quality = validateCampaignQuality(generated, dna, goal, platforms);
+            }
 
             // Continue repairing while any configured blocking quality issue remains.
             const remainingBlocking = quality.issues.filter((issue) =>

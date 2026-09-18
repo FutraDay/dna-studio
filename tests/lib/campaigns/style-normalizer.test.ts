@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeCampaignStyle } from "@/lib/campaigns/style-normalizer";
+import { normalizeCampaignStyle, repairCampaignDeterministically } from "@/lib/campaigns/style-normalizer";
 import type { CampaignStrategy, GeneratedCampaign } from "@/lib/campaigns/generator";
 
 const strategies: CampaignStrategy[] = [
@@ -62,6 +62,49 @@ describe("normalizeCampaignStyle", () => {
     expect(new Set(sets).size).toBe(sets.length);
     expect(normalized.concepts.flatMap((concept) => concept.assets)
       .some((asset) => asset.hashtags.length === 0)).toBe(true);
+  });
+
+  it("handles malformed local-model hashtag and caption fields without crashing", () => {
+    const malformed = campaignWith("A valid caption.") as unknown as { concepts: Array<{ assets: Array<Record<string, unknown>> }> };
+    malformed.concepts[0].assets[0].hashtags = "#FutraDay #Automation";
+    malformed.concepts[0].assets[1].hashtags = null;
+    malformed.concepts[0].assets[2].caption = null;
+
+    const normalized = normalizeCampaignStyle(malformed as unknown as GeneratedCampaign);
+
+    expect(normalized.concepts[0].assets[0].hashtags).toEqual(["#FutraDay", "#Automation"]);
+    expect(normalized.concepts[0].assets[1].hashtags).toEqual([]);
+    expect(normalized.concepts[0].assets[2].caption).toBe("");
+  });
+
+  it("repairs deterministic quality issues without another model call", () => {
+    const candidate = campaignWith("See how we helped a local business cut admin by 42%. The same workflow can be improved.");
+    for (const concept of candidate.concepts) {
+      for (const asset of concept.assets) {
+        asset.cta = "Learn more";
+        asset.imagePrompt = "Dashboard on a laptop screen with charts and interface panels";
+        if (asset.platform === "twitter") {
+          asset.caption = `${asset.caption} ${"Manual workflow friction keeps returning. ".repeat(10)}`;
+        }
+      }
+    }
+
+    const repaired = repairCampaignDeterministically(candidate, [
+      { code: "unsupported_metric", message: 'Concept 1 contains unsupported metric "42%".' },
+      { code: "unsupported_evidence_claim", message: 'Concept 1 implies unverified customer evidence with "see how we helped".' },
+      { code: "repeated_cta", message: 'CTA "learn more" is repeated across 20 assets.' },
+      { code: "cross_platform_similarity", message: "Concept 1 reuses near-duplicate copy across platforms." },
+      { code: "repetitive_visuals", message: "20 of 20 image prompts rely on dashboard/device imagery." },
+      { code: "twitter_length", message: "Concept 1 has an X/Twitter caption over 280 characters." },
+    ]);
+
+    const assets = repaired.concepts.flatMap((concept) => concept.assets);
+    const captions = assets.map((asset) => asset.caption.toLowerCase());
+    expect(captions.every((caption) => !caption.includes("see how we helped") && !caption.includes("42%"))).toBe(true);
+    expect(new Set(assets.map((asset) => asset.cta)).size).toBe(20);
+    expect(assets.every((asset) => !/dashboard|laptop|screen|device|interface|chart/i.test(asset.imagePrompt))).toBe(true);
+    expect(assets.filter((asset) => asset.platform === "twitter").every((asset) => asset.caption.length <= 280)).toBe(true);
+    expect(new Set(repaired.concepts[0].assets.map((asset) => asset.caption)).size).toBe(4);
   });
 
   it("does not mutate the input campaign", () => {
