@@ -15,6 +15,9 @@ export type CampaignQualityIssueCode =
   | "cross_platform_similarity"
   | "platform_style"
   | "generic_cliche"
+  | "generic_copy"
+  | "platform_depth"
+  | "emoji_overuse"
   | "unsupported_metric"
   | "unsupported_entity"
   | "unsupported_evidence_claim"
@@ -55,6 +58,21 @@ const CLICHES = [
   "tired of",
 ];
 
+const GENERIC_COPY_PATTERNS: Array<[RegExp, string]> = [
+  [/\bhey business owners\b/i, "hey business owners"],
+  [/\bwe want to hear from you\b/i, "we want to hear from you"],
+  [/\bour software solutions\b/i, "our software solutions"],
+  [/\bboost your business efficiency\b/i, "boost your business efficiency"],
+  [/\bfocus on growth\b/i, "focus on growth"],
+  [/\bstreamline your operations\b/i, "streamline your operations"],
+  [/\bget started\b/i, "get started"],
+  [/\bditch manual processes for good\b/i, "ditch manual processes for good"],
+  [/\bthe benefits of automation\b/i, "the benefits of automation"],
+  [/\bthe solution to manual business processes\b/i, "the solution to manual business processes"],
+  [/\bincreased efficiency, reduced costs,? and improved accuracy\b/i, "increased efficiency, reduced costs and improved accuracy"],
+];
+
+const EMOJI_PATTERN = /\p{Extended_Pictographic}/gu;
 const VISUAL_DEVICE_TERMS = /\b(?:dashboard|laptop|monitor|screen|device|interface|chart)\b/i;
 const METRIC_PATTERN = /\$\s?\d[\d,.]*|\b\d[\d,.]*\s?(?:%|percent|hours?|hrs?|days?|weeks?|months?|x|k|m|million|thousand)(?=\s|[.,!?;:]|$)/gi;
 const COMPANY_PATTERN = /\b[A-Z][A-Za-z0-9&'-]*(?:\s+[A-Z][A-Za-z0-9&'-]*){0,2}\s+(?:Co|Company|Corp|Inc|Ltd|Pty(?:\s+Ltd)?)\.?\b/g;
@@ -98,6 +116,23 @@ function normalize(value: string): string {
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function wordCount(value: string): number {
+  return value.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function emojiCount(value: string): number {
+  return value.match(EMOJI_PATTERN)?.length ?? 0;
+}
+
+function isProfessionalCampaign(dna: BrandDNA, goal: string): boolean {
+  const toneText = (dna.tone.primary + " " + dna.tone.secondary + " " + dna.tone.description).toLowerCase();
+  return (
+    dna.tone.formality >= 65 ||
+    /\bprofessional\b/i.test(goal) ||
+    /\bprofessional\b/.test(toneText)
+  );
 }
 
 function hookKey(caption: string): string {
@@ -219,6 +254,8 @@ export function validateCampaignQuality(
   const hashtagSets: string[] = [];
   const imagePrompts: string[] = [];
   let questionHookCount = 0;
+  let campaignEmojiCount = 0;
+  const professionalCampaign = isProfessionalCampaign(dna, goal);
   const evidence = evidenceText(dna, goal);
 
   concepts.forEach((concept, conceptIndex) => {
@@ -273,6 +310,32 @@ export function validateCampaignQuality(
         issues.push({
           code: "twitter_length",
           message: `Concept ${conceptIndex + 1} has an X/Twitter caption over 280 characters.`,
+        });
+      }
+
+      const assetEmojiCount = emojiCount(asset.caption);
+      campaignEmojiCount += assetEmojiCount;
+      if (professionalCampaign && asset.platform === "linkedin" && assetEmojiCount > 0) {
+        issues.push({
+          code: "emoji_overuse",
+          message: `Concept ${conceptIndex + 1} uses emojis in a professional LinkedIn caption. Remove them.`,
+        });
+      }
+
+      if (asset.platform === "linkedin" && wordCount(asset.caption) < 18) {
+        issues.push({
+          code: "platform_depth",
+          message: `Concept ${conceptIndex + 1} LinkedIn caption is too shallow (${wordCount(asset.caption)} words). Write a complete professional insight, not a title or teaser.`,
+        });
+      }
+
+      const genericMatches = GENERIC_COPY_PATTERNS
+        .filter(([pattern]) => pattern.test(asset.caption))
+        .map(([, label]) => label);
+      if (genericMatches.length > 0) {
+        issues.push({
+          code: "generic_copy",
+          message: `Concept ${conceptIndex + 1} uses generic filler: ${genericMatches.map((label) => `"${label}"`).join(", ")}. Replace it with a specific operational observation or takeaway.`,
         });
       }
 
@@ -370,6 +433,13 @@ export function validateCampaignQuality(
     issues.push({
       code: "question_hook_overuse",
       message: `${questionHookCount} assets open with questions. Use no more than 2 question-style hooks across the campaign.`,
+    });
+  }
+
+  if (professionalCampaign && campaignEmojiCount > 2) {
+    issues.push({
+      code: "emoji_overuse",
+      message: `Professional campaign copy uses ${campaignEmojiCount} emojis across ${captions.length} assets. Use no more than 2 total and none on LinkedIn.`,
     });
   }
 

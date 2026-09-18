@@ -51,7 +51,7 @@ Generate exactly 5 campaign concepts. The five concepts must have DISTINCT strat
 
 For each concept, create genuinely platform-specific content rather than shortening the same copy.
 
-Return a JSON object with this EXACT structure:
+Return a JSON object with this EXACT structure. Do not add extra fields such as "text", "body", "title", or "headline". The complete social post must always be stored in "caption":
 {
   "concepts": [
     {
@@ -96,18 +96,21 @@ PLATFORM CONTENT DIRECTOR RULES:
 11. Twitter: under 280 characters, ideally 100-240 characters. Lead with a sharp observation or assertion rather than compressing the LinkedIn post. Use no more than 2 hashtags.
 12. Across the entire 20-asset campaign, use no more than 2 question-style opening hooks. Most posts should open with assertions, observations, scenarios, contrasts, or direct statements.
 13. Do not repeat an opening phrase, CTA wording, or identical hashtag set. Avoid templated openings entirely: "Curious about", "Worried about", "Thinking about", "Ever wondered", "Ready to", "Tired of", "Why settle for", and "Think again".
-14. Within each concept, the platform captions must be materially different in wording and structure; do not merely shorten or expand the same sentences.
-15. Give each concept a distinct content job: concept 1 = concrete day-in-the-life pain scenario; concept 2 = practical how-to or inline 3-step checklist; concept 3 = transparent process, behind-the-scenes explanation, or product demonstration grounded in verified facts; concept 4 = objection handling plus a specific real product/service example supported by the Brand Profile or goal; concept 5 = comparison/decision framing plus a direct conversion CTA. Do not collapse these into five versions of generic automation advice.
-16. All content must match the brand's ${dna.tone.primary} tone.
-17. All content must be in ${language}.
-18. Hashtags must be relevant and platform-appropriate; never reuse an identical non-empty hashtag set across assets.
+14. Do not use generic filler such as "Hey business owners", "we want to hear from you", "our software solutions", "boost your business efficiency", "focus on growth", "streamline your operations", "get started", "ditch manual processes for good", "The Benefits of Automation", or "The Solution to Manual Business Processes". Replace generic claims with a specific operational observation, example, or takeaway.
+15. Never put hashtags inside the caption text. Hashtags belong only in the separate "hashtags" array. Each hashtag must be a single valid token with no spaces.
+16. For professional B2B campaigns, use no emojis unless the brand profile explicitly calls for a playful or casual voice. LinkedIn captions should contain no emojis.
+17. Within each concept, the platform captions must be materially different in wording and structure; do not merely shorten or expand the same sentences.
+18. Give each concept a distinct content job: concept 1 = concrete day-in-the-life pain scenario; concept 2 = practical how-to or inline 3-step checklist; concept 3 = transparent process, behind-the-scenes explanation, or product demonstration grounded in verified facts; concept 4 = objection handling plus a specific real product/service example supported by the Brand Profile or goal; concept 5 = comparison/decision framing plus a direct conversion CTA. Do not collapse these into five versions of generic automation advice.
+19. All content must match the brand's ${dna.tone.primary} tone.
+20. All content must be in ${language}.
+21. Hashtags must be relevant and platform-appropriate; never reuse an identical non-empty hashtag set across assets.
 
 VISUAL DIVERSITY RULES:
-19. The five concepts must use materially different visual treatments. Rotate among real-world customer/problem scenes, branded conceptual/process imagery, product/service context, before-and-after or transformation imagery, and outcome-focused scenes.
-20. Do not make every visual a laptop, dashboard, device mockup, or abstract chart, even for software/AI brands.
-21. Do NOT invent fake product screenshots or fake readable UI and present them as the brand's real software. If showing a conceptual interface, make it clearly illustrative and avoid tiny pseudo-text.
-22. Avoid generated marketing copy, labels, statistics, logos, and tiny text inside the image. The social post caption carries the message.
-23. Image prompts must reference the brand's actual colors and visual tone while changing composition, setting, subject, camera angle, and visual metaphor across concepts.`;
+22. The five concepts must use materially different visual treatments. Rotate among real-world customer/problem scenes, branded conceptual/process imagery, product/service context, before-and-after or transformation imagery, and outcome-focused scenes.
+23. Do not make every visual a laptop, dashboard, device mockup, or abstract chart, even for software/AI brands.
+24. Do NOT invent fake product screenshots or fake readable UI and present them as the brand's real software. If showing a conceptual interface, make it clearly illustrative and avoid tiny pseudo-text.
+25. Avoid generated marketing copy, labels, statistics, logos, and tiny text inside the image. The social post caption carries the message.
+26. Image prompts must reference the brand's actual colors and visual tone while changing composition, setting, subject, camera angle, and visual metaphor across concepts.`;
 }
 
 export function buildImagePrompt(

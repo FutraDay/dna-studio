@@ -279,6 +279,29 @@ describe("validateCampaignQuality", () => {
     expect(result.issues.some((issue) => issue.code === "platform_style")).toBe(true);
   });
 
+  it("rejects generic filler that reads like templated AI copy", () => {
+    const campaign = makeCampaign(["facebook"]);
+    campaign.concepts[0].assets[0].caption =
+      "Hey business owners, our software solutions can streamline your operations so you can focus on growth and get started today.";
+    const result = validateCampaignQuality(campaign, dna, "Professional campaign", ["facebook"]);
+    expect(result.issues.some((issue) => issue.code === "generic_copy")).toBe(true);
+  });
+
+  it("rejects LinkedIn title-only output instead of a complete post", () => {
+    const campaign = makeCampaign(["linkedin"]);
+    campaign.concepts[0].assets[0].caption = "The Hidden Costs of Manual Business Processes";
+    const result = validateCampaignQuality(campaign, dna, "Professional B2B campaign", ["linkedin"]);
+    expect(result.issues.some((issue) => issue.code === "platform_depth")).toBe(true);
+  });
+
+  it("rejects emoji-heavy copy for a professional campaign", () => {
+    const campaign = makeCampaign(["linkedin"]);
+    campaign.concepts[0].assets[0].caption =
+      "Manual quote follow-ups create avoidable workflow friction for busy service teams. A clear owner and next-action rule makes the process easier to inspect and improve. 📈";
+    const result = validateCampaignQuality(campaign, dna, "Professional B2B campaign", ["linkedin"]);
+    expect(result.issues.some((issue) => issue.code === "emoji_overuse")).toBe(true);
+  });
+
   it("rejects campaigns dominated by dashboard and device imagery", () => {
     const campaign = makeCampaign();
     campaign.concepts.forEach((concept, index) => {

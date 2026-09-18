@@ -67,6 +67,11 @@ export default function CampaignPage() {
     const pending = campaign.assets.filter((asset) => asset.imagePrompt && !asset.imageUrl);
     if (pending.length === 0) return;
 
+    const confirmed = window.confirm(
+      `Generate ${pending.length} images now? This will call your configured image provider and may consume paid API credits. No images are generated unless you confirm.`
+    );
+    if (!confirmed) return;
+
     setImageGenProgress({ done: 0, total: pending.length });
     for (let i = 0; i < pending.length; i++) {
       const asset = pending[i];
@@ -133,6 +138,11 @@ export default function CampaignPage() {
   };
 
   const handleGenerateImage = async (assetId: string, prompt: string): Promise<string | null> => {
+    const confirmed = window.confirm(
+      "Generate this image now? This will call your configured image provider and may consume paid API credits."
+    );
+    if (!confirmed) return null;
+
     const res = await fetch("/api/images/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -218,7 +228,7 @@ export default function CampaignPage() {
               <Card className="p-4">
                 <span className="text-xs text-muted">Concepts</span>
                 <div className="space-y-3 mt-3">
-                  {campaign.concepts.slice(0, 3).map((concept, i) => (
+                  {campaign.concepts.map((concept, i) => (
                     <div key={i}>
                       <p className="text-xs font-medium">{concept.name}</p>
                       <p className="text-[11px] text-muted mt-0.5">{concept.description}</p>
@@ -246,7 +256,7 @@ export default function CampaignPage() {
                 >
                   {imageGenProgress
                     ? `${imageGenProgress.done}/${imageGenProgress.total}`
-                    : `Generate ${campaign.assets.filter((asset) => asset.imagePrompt && !asset.imageUrl).length} images`}
+                    : `Generate ${campaign.assets.filter((asset) => asset.imagePrompt && !asset.imageUrl).length} images (uses credits)`}
                 </Button>
               )}
             </div>

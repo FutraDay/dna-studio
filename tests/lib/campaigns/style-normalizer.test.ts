@@ -72,9 +72,28 @@ describe("normalizeCampaignStyle", () => {
 
     const normalized = normalizeCampaignStyle(malformed as unknown as GeneratedCampaign);
 
-    expect(normalized.concepts[0].assets[0].hashtags).toEqual(["#FutraDay", "#Automation"]);
+    expect(normalized.concepts[0].assets[0].hashtags).toEqual(["FutraDay", "Automation"]);
     expect(normalized.concepts[0].assets[1].hashtags).toEqual([]);
     expect(normalized.concepts[0].assets[2].caption).toBe("");
+  });
+
+  it("merges local-model text fields into the caption and removes inline hashtag duplication", () => {
+    const candidate = campaignWith("A short LinkedIn heading");
+    const linkedIn = candidate.concepts[0].assets.find((asset) => asset.platform === "linkedin")!;
+    linkedIn.text = "A complete professional explanation of the workflow problem and the practical takeaway for the business owner.";
+    linkedIn.caption = "A short LinkedIn heading #FutraDay #Automation";
+    linkedIn.hashtags = ["#FutraDay", "quote follow-ups"];
+    linkedIn.imagePrompt = "Professional office scene, with the logo and tagline prominently displayed";
+
+    const normalized = normalizeCampaignStyle(candidate);
+    const asset = normalized.concepts[0].assets.find((item) => item.platform === "linkedin")!;
+
+    expect(asset.caption).toContain("A complete professional explanation");
+    expect(asset.caption).not.toContain("#FutraDay");
+    expect(asset.caption).not.toContain("#Automation");
+    expect(asset.hashtags).toEqual(["FutraDay", "quotefollowups"]);
+    expect(asset.imagePrompt).not.toMatch(/logo and tagline prominently displayed/i);
+    expect(asset.imagePrompt).toContain("No words, labels, logos, numbers, or legible controls");
   });
 
   it("repairs deterministic quality issues without another model call", () => {

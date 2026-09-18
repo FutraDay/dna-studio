@@ -164,16 +164,60 @@ function startsWithQuestion(caption: string): boolean {
 }
 
 function coerceHashtags(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.filter((tag): tag is string => typeof tag === "string" && tag.trim().length > 0);
+  const raw = Array.isArray(value)
+    ? value.filter((tag): tag is string => typeof tag === "string" && tag.trim().length > 0)
+    : typeof value === "string"
+      ? value.split(/[\s,]+/).map((tag) => tag.trim()).filter(Boolean)
+      : [];
+
+  return raw
+    .map((tag) => tag.replace(/^#+/, "").replace(/[^\p{L}\p{N}_]+/gu, ""))
+    .filter(Boolean);
+}
+
+function mergeLegacyAssetText(caption: string, text: unknown): string {
+  const body = typeof text === "string" ? text.trim() : "";
+  const heading = caption.trim();
+  if (!body) return heading;
+  if (!heading) return body;
+
+  const normalizedHeading = heading.toLowerCase().replace(/\s+/g, " ");
+  const normalizedBody = body.toLowerCase().replace(/\s+/g, " ");
+  if (normalizedBody.includes(normalizedHeading) || normalizedHeading.includes(normalizedBody)) {
+    return body.length > heading.length ? body : heading;
   }
-  if (typeof value === "string") {
-    return value
-      .split(/[\s,]+/)
-      .map((tag) => tag.trim())
-      .filter(Boolean);
+
+  return heading.length <= 140 ? `${heading}\n\n${body}` : heading;
+}
+
+function stripInlineHashtags(caption: string, hashtags: unknown): string {
+  let result = caption;
+  const rawTags = Array.isArray(hashtags)
+    ? hashtags.filter((tag): tag is string => typeof tag === "string")
+    : [];
+
+  for (const tag of rawTags) {
+    const exact = `#${tag.trim().replace(/^#+/, "")}`;
+    if (exact.length > 1) result = result.split(exact).join("");
   }
-  return [];
+
+  return result
+    .replace(/(^|\s)#[\p{L}\p{N}_-]+/gu, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\s+([,.;!?])/g, "$1")
+    .trim();
+}
+
+function normalizeImagePrompt(value: unknown): string {
+  const prompt = typeof value === "string" ? value.trim() : "";
+  if (!prompt) return "";
+  const guardrail = "No words, labels, logos, numbers, or legible controls in the image.";
+  const cleaned = prompt
+    .replace(/,?\s*with (?:the )?logo and tagline prominently displayed/gi, "")
+    .replace(/,?\s*with (?:the )?logo prominently displayed/gi, "")
+    .replace(new RegExp(`\\s*${guardrail.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}$`, "i"), "")
+    .trim();
+  return `${cleaned} ${guardrail}`.trim();
 }
 
 function normalizeHashtagSet(hashtags: string[]): string {
@@ -201,7 +245,11 @@ export function normalizeCampaignStyle(campaign: GeneratedCampaign): GeneratedCa
     concepts: concepts.map((concept) => ({
       ...concept,
       assets: (Array.isArray(concept?.assets) ? concept.assets : []).map((asset) => {
-        let caption = replaceCliches(typeof asset?.caption === "string" ? asset.caption : "");
+        const mergedCaption = mergeLegacyAssetText(
+          typeof asset?.caption === "string" ? asset.caption : "",
+          asset?.text
+        );
+        let caption = replaceCliches(stripInlineHashtags(mergedCaption, asset?.hashtags));
         if (startsWithQuestion(caption)) {
           if (questionHooksKept < 2) questionHooksKept += 1;
           else {
@@ -219,7 +267,15 @@ export function normalizeCampaignStyle(campaign: GeneratedCampaign): GeneratedCa
         }
         if (hashtagKey) seenHashtagSets.add(hashtagKey);
 
-        return { ...asset, caption, hashtags };
+        const sanitizedAsset = { ...asset };
+        delete sanitizedAsset.text;
+
+        return {
+          ...sanitizedAsset,
+          caption,
+          hashtags,
+          imagePrompt: normalizeImagePrompt(asset?.imagePrompt),
+        };
       }),
     })),
   };

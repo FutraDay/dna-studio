@@ -148,10 +148,14 @@ export function AssetCard({
           {generatingImage ? (
             <Loader2 className="w-8 h-8 text-accent animate-spin" />
           ) : !imageUrl ? (
-            <p className="text-center text-lg font-semibold leading-snug text-foreground/90 max-w-[90%]">
-              {caption.split("\n")[0]?.slice(0, 80)}
-              {caption.length > 80 ? "..." : ""}
-            </p>
+            <div className="max-w-[86%] text-center">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-muted/70">
+                Copy draft
+              </p>
+              <p className="mt-3 text-sm font-medium leading-relaxed text-foreground/80 line-clamp-4">
+                {caption.split(/(?<=[.!?])\s+/)[0]?.slice(0, 140)}
+              </p>
+            </div>
           ) : null}
         </div>
 
@@ -217,7 +221,7 @@ export function AssetCard({
               disabled={generatingImage}
             >
               <Sparkles className="w-3 h-3" />
-              {generatingImage ? "Generating..." : "Generate Image"}
+              {generatingImage ? "Generating..." : "Generate Image · Uses Credits"}
             </Button>
           )}
 

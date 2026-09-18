@@ -81,6 +81,9 @@ export async function POST(request: Request) {
             "cross_platform_similarity",
             "platform_style",
             "generic_cliche",
+            "generic_copy",
+            "platform_depth",
+            "emoji_overuse",
             "concept_similarity",
             "repetitive_visuals",
           ]);
