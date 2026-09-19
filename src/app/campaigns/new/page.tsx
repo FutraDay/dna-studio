@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { AppShell } from "@/components/layout/app-shell";
@@ -8,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   Megaphone,
-  ArrowRight,
   Instagram,
   Linkedin,
   Facebook,
@@ -360,10 +360,13 @@ function NewCampaignContent() {
                         {/* Image area */}
                         <div className="aspect-[16/10] bg-surface relative overflow-hidden">
                           {suggestion.imageUrl ? (
-                            <img
+                            <Image
                               src={suggestion.imageUrl}
                               alt={suggestion.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              fill
+                              unoptimized
+                              sizes="(min-width: 640px) 50vw, 100vw"
+                              className="object-cover group-hover:scale-105 transition-transform duration-500"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">

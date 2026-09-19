@@ -69,8 +69,8 @@ describe("streamCampaign", () => {
   it("streams with the same options as the non-streaming path", async () => {
     stream.mockImplementation(async function* () {} as never);
 
-    for await (const _ of streamCampaign(dna, "goal", ["instagram"])) {
-      // drain
+    for await (const chunk of streamCampaign(dna, "goal", ["instagram"])) {
+      void chunk;
     }
 
     expect(stream).toHaveBeenCalledWith(expect.anything(), {

@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { AppShell } from "@/components/layout/app-shell";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowRight, Megaphone, Dna, Globe } from "lucide-react";
+import { Dna, Globe } from "lucide-react";
 
 interface Brand {
   id: string;
@@ -21,28 +19,16 @@ interface Brand {
   _count: { campaigns: number };
 }
 
-interface Campaign {
-  id: string;
-  goal: string;
-  createdAt: string;
-  brand: { name: string; colors: string[] };
-  _count: { assets: number };
-}
-
 export default function DashboardPage() {
   const router = useRouter();
   const [brands, setBrands] = useState<Brand[]>([]);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/brands").then((r) => r.json()),
-      fetch("/api/campaigns").then((r) => r.json()),
-    ])
-      .then(([brandsData, campaignsData]) => {
+    fetch("/api/brands")
+      .then((response) => response.json())
+      .then((brandsData) => {
         setBrands(Array.isArray(brandsData) ? brandsData : []);
-        setCampaigns(Array.isArray(campaignsData) ? campaignsData : []);
       })
       .finally(() => setLoading(false));
   }, []);

@@ -244,41 +244,6 @@ export default function PhotoshootPage() {
     }
   };
 
-  // Save or update the photoshoot record
-  const savePhotoshoot = useCallback(
-    async (updatedResults: GeneratedImage[], status: string) => {
-      try {
-        if (currentPhotoshootId) {
-          // Update existing
-          await fetch(`/api/photoshoots/${currentPhotoshootId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ results: updatedResults, status }),
-          });
-        } else {
-          // Create new
-          const res = await fetch("/api/photoshoots", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              productImage,
-              productDescription,
-              templates: selectedTemplates,
-              results: updatedResults,
-            }),
-          });
-          if (res.ok) {
-            const data = await res.json();
-            setCurrentPhotoshootId(data.id);
-          }
-        }
-      } catch {
-        // Don't block generation on save failure
-      }
-    },
-    [currentPhotoshootId, productImage, productDescription, selectedTemplates]
-  );
-
   const handleGenerate = useCallback(async () => {
     if (selectedTemplates.length === 0) return;
     setStep("results");
@@ -402,7 +367,7 @@ export default function PhotoshootPage() {
       // Refresh gallery
       fetchSavedPhotoshoots();
     }
-  }, [productImage, productDescription, selectedTemplates, analysisDescription, allTemplates, currentPhotoshootId, savePhotoshoot]);
+  }, [productImage, productDescription, selectedTemplates, analysisDescription, allTemplates, currentPhotoshootId]);
 
   const completedResults = results.filter((r) => r.status === "done" && r.url);
 

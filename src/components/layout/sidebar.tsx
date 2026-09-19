@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -98,9 +99,12 @@ export function Sidebar() {
           {activeBrand ? (
             <>
               {activeBrand.logoUrl ? (
-                <img
+                <Image
                   src={activeBrand.logoUrl}
                   alt={activeBrand.name}
+                  width={24}
+                  height={24}
+                  unoptimized
                   className="w-6 h-6 rounded object-cover bg-white flex-shrink-0"
                 />
               ) : (
@@ -147,9 +151,12 @@ export function Sidebar() {
                 )}
               >
                 {brand.logoUrl ? (
-                  <img
+                  <Image
                     src={brand.logoUrl}
                     alt={brand.name}
+                    width={20}
+                    height={20}
+                    unoptimized
                     className="w-5 h-5 rounded object-cover bg-white flex-shrink-0"
                   />
                 ) : (

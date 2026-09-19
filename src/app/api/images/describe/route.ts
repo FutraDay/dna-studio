@@ -31,7 +31,7 @@ export async function POST(request: Request) {
         break;
       default:
         // Ollama and others — fall back to text-only (no vision)
-        description = await describeWithTextOnly(imageUrl);
+        description = await describeWithTextOnly();
         break;
     }
 
@@ -132,7 +132,7 @@ async function describeWithAnthropic(imageUrl: string, apiKey: string, model: st
   return textBlock && "text" in textBlock ? textBlock.text : "";
 }
 
-async function describeWithTextOnly(imageUrl: string): Promise<string> {
+async function describeWithTextOnly(): Promise<string> {
   // Fallback for providers without vision — return a generic prompt
   const { getLLMProvider } = await import("@/lib/llm/client");
   const provider = await getLLMProvider();
