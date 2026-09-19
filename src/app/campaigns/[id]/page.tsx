@@ -7,7 +7,17 @@ import { AppShell } from "@/components/layout/app-shell";
 import { AssetCard } from "@/components/campaigns/asset-card";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Megaphone, Instagram, Linkedin, Facebook, Twitter, ArrowLeft } from "lucide-react";
+import {
+  Megaphone,
+  Instagram,
+  Linkedin,
+  Facebook,
+  Twitter,
+  ArrowLeft,
+  FlaskConical,
+  CopyPlus,
+  CheckCircle2,
+} from "lucide-react";
 
 interface Asset {
   id: string;
@@ -22,9 +32,25 @@ interface Asset {
   conceptIndex: number | null;
 }
 
+interface CampaignVariant {
+  id: string;
+  variantLabel: string | null;
+  isPreferredVariant: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface CampaignData {
   id: string;
   goal: string;
+  experimentId: string | null;
+  variantLabel: string | null;
+  isPreferredVariant: boolean;
+  experiment: {
+    id: string;
+    preferredCampaignId: string | null;
+    variants: CampaignVariant[];
+  } | null;
   concepts: Array<{
     name: string;
     description: string;
@@ -54,6 +80,7 @@ export default function CampaignPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
   const [imageGenProgress, setImageGenProgress] = useState<{ done: number; total: number } | null>(null);
+  const [variantAction, setVariantAction] = useState<"create" | "select" | null>(null);
 
   useEffect(() => {
     fetch(`/api/campaigns/${params.id}`)
@@ -62,6 +89,44 @@ export default function CampaignPage() {
       .finally(() => setLoading(false));
   }, [params.id]);
 
+  const refreshCampaign = async () => {
+    const response = await fetch(`/api/campaigns/${params.id}`);
+    if (!response.ok) return false;
+    setCampaign(await response.json());
+    return true;
+  };
+
+  const handleCreateVariant = async () => {
+    if (!campaign || variantAction) return;
+
+    setVariantAction("create");
+    try {
+      const response = await fetch(`/api/campaigns/${campaign.id}/variants`, {
+        method: "POST",
+      });
+      if (!response.ok) return;
+      await refreshCampaign();
+    } finally {
+      setVariantAction(null);
+    }
+  };
+
+  const handleSelectPreferredVariant = async () => {
+    if (!campaign?.experiment || variantAction) return;
+
+    setVariantAction("select");
+    try {
+      const response = await fetch(`/api/campaigns/${campaign.id}/variants`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferredCampaignId: campaign.id }),
+      });
+      if (!response.ok) return;
+      await refreshCampaign();
+    } finally {
+      setVariantAction(null);
+    }
+  };
 
   const handleGenerateAllImages = async () => {
     if (!campaign || imageGenProgress) return;
@@ -226,6 +291,11 @@ export default function CampaignPage() {
           <div className="flex items-center gap-2 text-xs text-accent mb-3">
             <Megaphone className="w-4 h-4" />
             <span>{campaign.brand.name}</span>
+            {campaign.variantLabel && (
+              <span className="px-2 py-0.5 rounded-full border border-accent/30 bg-accent/10 text-[10px] font-semibold uppercase tracking-wide">
+                Variant {campaign.variantLabel}
+              </span>
+            )}
           </div>
           <h1 className="text-3xl font-[family-name:var(--font-heading)] italic mb-2">
             Campaign review
@@ -259,6 +329,81 @@ export default function CampaignPage() {
               <p className="text-xs text-muted mt-2">
                 {campaign.brand.name}
               </p>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <FlaskConical className="w-3.5 h-3.5 text-accent" />
+                <span className="text-xs text-muted">A/B test</span>
+              </div>
+
+              {!campaign.experiment ? (
+                <>
+                  <p className="text-sm font-medium">
+                    Test a second version without spending credits
+                  </p>
+                  <p className="text-xs text-muted mt-2 leading-relaxed">
+                    Variant B copies this campaign and all current posts into fresh drafts.
+                    No AI text or image generation runs automatically.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="w-full mt-4"
+                    onClick={handleCreateVariant}
+                    loading={variantAction === "create"}
+                  >
+                    <CopyPlus className="w-3.5 h-3.5" />
+                    Create Variant B · No credits
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    {campaign.experiment.variants.map((variant) => {
+                      const current = variant.id === campaign.id;
+                      return (
+                        <Link
+                          key={variant.id}
+                          href={`/campaigns/${variant.id}`}
+                          className={`flex-1 rounded-lg border px-3 py-2 text-center text-xs font-semibold transition-colors ${
+                            current
+                              ? "border-accent bg-accent/10 text-accent"
+                              : "border-border text-muted hover:text-foreground hover:border-accent/30"
+                          }`}
+                        >
+                          Variant {variant.variantLabel ?? "?"}
+                        </Link>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-4 rounded-lg border border-border bg-background/30 p-3">
+                    {campaign.experiment.preferredCampaignId === campaign.id ? (
+                      <div className="flex items-center gap-2 text-xs text-accent font-medium">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Preferred variant
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="w-full"
+                        onClick={handleSelectPreferredVariant}
+                        loading={variantAction === "select"}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Choose this variant
+                      </Button>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] text-muted mt-3 leading-relaxed">
+                    Preference is manual for now. The analytics milestone will compare
+                    real post performance before declaring a measured winner.
+                  </p>
+                </>
+              )}
             </Card>
 
             {Array.isArray(campaign.concepts) && campaign.concepts.length > 0 && (

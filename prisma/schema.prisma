@@ -80,16 +80,22 @@ model Brand {
 }
 
 model Campaign {
-  id        String   @id @default(cuid())
-  brandId   String
-  userId    String
-  goal      String
-  concepts  Json
-  assets    Asset[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String   @id @default(cuid())
+  brandId            String
+  userId             String
+  goal               String
+  concepts           Json
+  experimentId       String?
+  variantLabel       String?
+  isPreferredVariant Boolean  @default(false)
+  assets             Asset[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  brand              Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, experimentId])
+  @@unique([userId, experimentId, variantLabel])
 }
 
 model Asset {

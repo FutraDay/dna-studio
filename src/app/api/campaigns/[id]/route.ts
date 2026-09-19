@@ -95,8 +95,34 @@ export async function GET(
     }
 
     const concepts = conceptsFromJson(campaign.concepts);
+    const experimentVariants = campaign.experimentId
+      ? await prisma.campaign.findMany({
+          where: {
+            userId: session.user.id,
+            experimentId: campaign.experimentId,
+          },
+          orderBy: { variantLabel: "asc" },
+          select: {
+            id: true,
+            variantLabel: true,
+            isPreferredVariant: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        })
+      : [];
+
     return NextResponse.json({
       ...campaign,
+      experiment: campaign.experimentId
+        ? {
+            id: campaign.experimentId,
+            preferredCampaignId:
+              experimentVariants.find((variant) => variant.isPreferredVariant)
+                ?.id ?? null,
+            variants: experimentVariants,
+          }
+        : null,
       assets: campaign.assets.map((asset) => ({
         ...asset,
         conceptIndex: conceptIndexForAsset(
