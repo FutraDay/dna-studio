@@ -99,19 +99,40 @@ model Campaign {
 }
 
 model Asset {
-  id          String    @id @default(cuid())
-  campaignId  String
-  platform    String
-  caption     String    @db.Text
-  imageUrl    String?
-  imagePrompt String?   @db.Text
-  hashtags    String[]
-  scheduledAt DateTime?
-  publishedAt DateTime?
-  status      String    @default("draft")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  campaign    Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  id             String               @id @default(cuid())
+  campaignId     String
+  platform       String
+  caption        String               @db.Text
+  imageUrl       String?
+  imagePrompt    String?              @db.Text
+  hashtags       String[]
+  providerPostId String?
+  scheduledAt    DateTime?
+  publishedAt    DateTime?
+  status         String               @default("draft")
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  campaign       Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  metrics        PostMetricSnapshot[]
+
+  @@index([providerPostId])
+}
+
+model PostMetricSnapshot {
+  id          String   @id @default(cuid())
+  assetId     String
+  impressions Int      @default(0)
+  reach       Int      @default(0)
+  likes       Int      @default(0)
+  comments    Int      @default(0)
+  shares      Int      @default(0)
+  clicks      Int      @default(0)
+  saves       Int      @default(0)
+  source      String   @default("provider")
+  fetchedAt   DateTime @default(now())
+  asset       Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId, fetchedAt])
 }
 
 model Photoshoot {

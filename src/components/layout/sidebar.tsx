@@ -11,6 +11,7 @@ import {
   Megaphone,
   Camera,
   Video,
+  BarChart3,
   Settings,
   LogOut,
   ChevronDown,
@@ -71,6 +72,7 @@ export function Sidebar() {
   const navItems = [
     { href: activeBrandId ? `/brands/${activeBrandId}` : "/dashboard", label: "Business DNA", icon: Dna },
     { href: "/campaigns/new", label: "Campaigns", icon: Megaphone },
+    { href: "/analytics", label: "Analytics", icon: BarChart3 },
     { href: "/photoshoot", label: "Photoshoot", icon: Camera },
     { href: "/ugc", label: "UGC Studio", icon: Video },
     { href: "/settings", label: "Settings", icon: Settings },

@@ -169,10 +169,22 @@ describe("POST /api/campaigns/[id]/publish", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      results: [{ assetId: "asset_1", status: "published", result: { id: "t1" } }],
+      results: [
+        {
+          assetId: "asset_1",
+          status: "published",
+          result: { id: "t1" },
+          providerPostId: "t1",
+        },
+      ],
     });
     expect(asset.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: "published" }) })
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "published",
+          providerPostId: "t1",
+        }),
+      })
     );
   });
 

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { publishToFacebook, publishToInstagram } from "@/lib/social/meta";
 import { publishToTwitter } from "@/lib/social/twitter";
 import { publishToLinkedIn } from "@/lib/social/linkedin";
+import { extractProviderPostId } from "@/lib/analytics/metrics";
 
 const publishSchema = z.object({
   assetIds: z.array(z.string()),
@@ -95,12 +96,25 @@ export async function POST(
             break;
         }
 
+        const providerPostId = extractProviderPostId(
+          result,
+          asset.platform
+        );
         await prisma.asset.update({
           where: { id: asset.id },
-          data: { status: "published", publishedAt: new Date() },
+          data: {
+            status: "published",
+            publishedAt: new Date(),
+            ...(providerPostId ? { providerPostId } : {}),
+          },
         });
 
-        results.push({ assetId: asset.id, status: "published", result });
+        results.push({
+          assetId: asset.id,
+          status: "published",
+          result,
+          providerPostId,
+        });
       } catch (error) {
         await prisma.asset.update({
           where: { id: asset.id },

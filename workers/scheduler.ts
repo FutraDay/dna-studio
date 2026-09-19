@@ -1,5 +1,6 @@
 import { Worker } from "bullmq";
 import { PrismaClient } from "@prisma/client";
+import { extractProviderPostId } from "../src/lib/analytics/metrics";
 
 const prisma = new PrismaClient();
 
@@ -34,11 +35,13 @@ const worker = new Worker(
     }
 
     try {
+      let result: unknown;
+
       // Dynamic import based on platform
       switch (asset.platform) {
         case "facebook": {
           const { publishToFacebook } = await import("../src/lib/social/meta");
-          await publishToFacebook({
+          result = await publishToFacebook({
             accessToken: connection.accessToken,
             pageId: connection.accountId,
             message: `${asset.caption}\n\n${asset.hashtags.map((h: string) => `#${h}`).join(" ")}`,
@@ -49,7 +52,7 @@ const worker = new Worker(
         }
         case "instagram": {
           const { publishToInstagram } = await import("../src/lib/social/meta");
-          await publishToInstagram({
+          result = await publishToInstagram({
             accessToken: connection.accessToken,
             pageId: connection.accountId,
             message: `${asset.caption}\n\n${asset.hashtags.map((h: string) => `#${h}`).join(" ")}`,
@@ -60,7 +63,7 @@ const worker = new Worker(
         }
         case "twitter": {
           const { publishToTwitter } = await import("../src/lib/social/twitter");
-          await publishToTwitter({
+          result = await publishToTwitter({
             apiKey: process.env.TWITTER_API_KEY || "",
             apiSecret: process.env.TWITTER_API_SECRET || "",
             accessToken: connection.accessToken,
@@ -71,7 +74,7 @@ const worker = new Worker(
         }
         case "linkedin": {
           const { publishToLinkedIn } = await import("../src/lib/social/linkedin");
-          await publishToLinkedIn({
+          result = await publishToLinkedIn({
             accessToken: connection.accessToken,
             personUrn: connection.accountId,
             text: `${asset.caption}\n\n${asset.hashtags.map((h: string) => `#${h}`).join(" ")}`,
@@ -81,9 +84,17 @@ const worker = new Worker(
         }
       }
 
+      const providerPostId = extractProviderPostId(
+        result,
+        asset.platform
+      );
       await prisma.asset.update({
         where: { id: assetId },
-        data: { status: "published", publishedAt: new Date() },
+        data: {
+          status: "published",
+          publishedAt: new Date(),
+          ...(providerPostId ? { providerPostId } : {}),
+        },
       });
 
       console.log(`Asset ${assetId} published successfully`);
