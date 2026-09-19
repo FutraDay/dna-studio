@@ -67,6 +67,8 @@ DNA Studio analyzes any website URL to extract a **Brand DNA** profile — color
 
 - **Streaming UX** — Real-time progress for brand analysis and content generation. See results as they're produced.
 
+- **Chrome Brand Analyzer** — Analyze the website in your active Chrome tab with one click. The extension hands the public page URL to your existing authenticated DNA Studio session and stores no AI credentials.
+
 ## Quick Start
 
 ### Docker (Recommended)
@@ -106,6 +108,23 @@ npm run dev
 # In another terminal, start the worker (for scheduled publishing)
 npm run worker
 ```
+
+### Chrome Extension
+
+The unpacked Manifest V3 extension lives in `extensions/chrome`.
+
+1. Open `chrome://extensions`.
+2. Enable **Developer mode**.
+3. Click **Load unpacked**.
+4. Select the repository folder `extensions/chrome`.
+5. Pin **DNA Studio — Brand Analyzer** to the toolbar.
+6. Open any public `http://` or `https://` website and click the extension icon.
+
+By default the extension opens `http://localhost:3000`. Use the extension's
+**Options** page to point it at a hosted DNA Studio URL later. The extension
+stores only that app URL in Chrome sync storage; authentication remains in the
+DNA Studio browser session and no provider/API credentials are copied into the
+extension.
 
 ## Configuration
 
@@ -224,6 +243,8 @@ dna-studio/
 │       └── auth/       # NextAuth configuration
 ├── prisma/             # Database schema and migrations
 ├── workers/            # BullMQ background workers
+├── extensions/
+│   └── chrome/         # One-click Brand DNA analyzer extension
 ├── docker/             # Container entrypoint (+ its tests)
 ├── docker-compose.yml  # One-command deployment
 └── Dockerfile
@@ -247,7 +268,7 @@ dna-studio/
 - [x] UGC video generation with creator avatars (Veo, HeyGen, D-ID)
 - [x] Health endpoint (`/api/health`) and container healthcheck
 - [x] CI on every pull request — migrations, entrypoint, build, and a full `docker compose` boot
-- [x] Test suite — 823 tests across the library, API routes, analytics, calendar, team collaboration, PDF export, webhooks, and key React UI flows, with a coverage gate in CI
+- [x] Test suite — 829 tests across the library, API routes, analytics, calendar, team collaboration, PDF export, webhooks, Chrome extension handoff, and key React UI flows, with a coverage gate in CI
 
 ### Up Next
 
@@ -259,7 +280,7 @@ dna-studio/
 - [x] Team collaboration — shared workspaces, owner/admin/member roles, shared brand/campaign access, collaborator-safe publishing credentials, and registered-user team management
 - [x] Brand style guide PDF export — workspace-authorized A4 PDF generation from saved Brand DNA, network-isolated rendering, and deployed download verification
 - [x] Webhook integrations (Zapier, n8n) — workspace-scoped signed HTTPS webhooks, SSRF-safe delivery, retries, delivery history, test sends, and event hooks for brands, campaigns, scheduling, publishing, and failures
-- [ ] Chrome extension for one-click brand analysis
+- [x] Chrome extension for one-click brand analysis — Manifest V3 toolbar/context-menu handoff, configurable DNA Studio URL, no credential storage, and automatic Brand DNA analysis for the active public website
 - [ ] Mobile app (React Native)
 
 ## Contributing

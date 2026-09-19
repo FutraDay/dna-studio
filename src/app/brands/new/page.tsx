@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useCallback, useEffect, Suspense } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  Suspense,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { AppShell } from "@/components/layout/app-shell";
@@ -31,6 +37,8 @@ function NewBrandContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialUrl = searchParams.get("url") || "";
+  const autoAnalyze = searchParams.get("autoAnalyze") === "1";
+  const autoAnalyzeStarted = useRef(false);
 
   const [url, setUrl] = useState(initialUrl);
   const [normalisedUrl, setNormalisedUrl] = useState("");
@@ -41,6 +49,7 @@ function NewBrandContent() {
   const [error, setError] = useState("");
   const [workspaces, setWorkspaces] = useState<WorkspaceOption[]>([]);
   const [workspaceId, setWorkspaceId] = useState("");
+  const [workspacesLoaded, setWorkspacesLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -63,6 +72,9 @@ function NewBrandContent() {
       })
       .catch(() => {
         // Brand analysis can still fall back to the personal workspace.
+      })
+      .finally(() => {
+        if (active) setWorkspacesLoaded(true);
       });
 
     return () => {
@@ -134,6 +146,20 @@ function NewBrandContent() {
       setPhase("input");
     }
   }, [url, workspaceId]);
+
+  useEffect(() => {
+    if (
+      !autoAnalyze ||
+      !initialUrl ||
+      !workspacesLoaded ||
+      autoAnalyzeStarted.current
+    ) {
+      return;
+    }
+
+    autoAnalyzeStarted.current = true;
+    void handleAnalyze();
+  }, [autoAnalyze, handleAnalyze, initialUrl, workspacesLoaded]);
 
   return (
     <AppShell>
