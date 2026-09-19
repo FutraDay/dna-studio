@@ -1,4 +1,13 @@
+import "@testing-library/jest-dom/vitest";
 import { afterEach, vi } from "vitest";
+
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "scrollTo", {
+    configurable: true,
+    value: vi.fn(),
+    writable: true,
+  });
+}
 
 // Provider modules read configuration from process.env at call time, so every
 // test starts from a known-empty environment rather than inheriting the

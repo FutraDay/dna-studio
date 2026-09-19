@@ -247,11 +247,11 @@ dna-studio/
 - [x] UGC video generation with creator avatars (Veo, HeyGen, D-ID)
 - [x] Health endpoint (`/api/health`) and container healthcheck
 - [x] CI on every pull request — migrations, entrypoint, build, and a full `docker compose` boot
-- [x] Test suite — 483 tests over the library and API routes, with a coverage gate in CI
+- [x] Test suite — 651 tests across the library, API routes, and key React UI flows, with a coverage gate in CI
 
 ### Up Next
 
-- [ ] Component and page tests (the suite covers `src/lib` and `src/app/api` today)
+- [x] Component and page tests — campaign asset actions, sidebar brand navigation, and dashboard onboarding/redirect flows
 
 - [ ] A/B testing for campaign variants
 - [ ] Analytics dashboard (post performance tracking)
