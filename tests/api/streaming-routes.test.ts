@@ -7,6 +7,9 @@ vi.mock("@/lib/db", () => {
 vi.mock("@/lib/auth/session", () => ({ requireSession: vi.fn(), getSession: vi.fn() }));
 vi.mock("@/lib/brand-dna/crawler", () => ({ crawlBrandDNA: vi.fn() }));
 vi.mock("@/lib/campaigns/generator", () => ({ streamCampaign: vi.fn(), repairCampaign: vi.fn() }));
+vi.mock("@/lib/webhooks/queue", () => ({
+  safeQueueWebhookEvents: vi.fn(),
+}));
 vi.mock("@/lib/workspaces/access", async () => {
   const actual = await vi.importActual<
     typeof import("@/lib/workspaces/access")
@@ -29,6 +32,7 @@ import {
   ensurePersonalWorkspace,
   requireWorkspaceRole,
 } from "@/lib/workspaces/access";
+import { safeQueueWebhookEvents } from "@/lib/webhooks/queue";
 
 const brand = vi.mocked(prisma.brand);
 const campaign = vi.mocked(prisma.campaign);
@@ -38,6 +42,7 @@ const stream = vi.mocked(streamCampaign);
 const repair = vi.mocked(repairCampaign);
 const ensureWorkspace = vi.mocked(ensurePersonalWorkspace);
 const workspaceRole = vi.mocked(requireWorkspaceRole);
+const queueWebhooks = vi.mocked(safeQueueWebhookEvents);
 
 const post = (url: string, body: unknown) =>
   new Request(`http://localhost${url}`, { method: "POST", body: JSON.stringify(body) });
@@ -66,6 +71,7 @@ beforeEach(() => {
       ownerId: "user_1",
     },
   } as never);
+  queueWebhooks.mockResolvedValue(0);
 });
 
 describe("POST /api/brands/analyze", () => {
@@ -130,6 +136,34 @@ describe("POST /api/brands/analyze", () => {
         audience: "Home brewers",
       }),
     });
+  });
+
+  it("queues a brand.created webhook after saving", async () => {
+    await readEvents(
+      await analyze(
+        post("/api/brands/analyze", { url: "https://acme.coffee" })
+      )
+    );
+
+    expect(queueWebhooks).toHaveBeenCalledWith(
+      prisma,
+      [
+        {
+          workspaceId: "ws_1",
+          event: "brand.created",
+          data: {
+            brand: {
+              id: "brand_1",
+              name: "Acme Coffee",
+              url: "https://acme.coffee",
+              industry: "Food & Beverage",
+              category: "Coffee Roaster",
+              tone: "friendly",
+            },
+          },
+        },
+      ]
+    );
   });
 
   it("places a new brand in an explicitly selected managed workspace", async () => {
@@ -248,7 +282,12 @@ describe("POST /api/campaigns/generate", () => {
   };
 
   beforeEach(() => {
-    brand.findFirst.mockResolvedValue({ id: "brand_1", dna: makeBrandDNA() } as never);
+    brand.findFirst.mockResolvedValue({
+      id: "brand_1",
+      name: "Acme Coffee",
+      workspaceId: "ws_1",
+      dna: makeBrandDNA(),
+    } as never);
     campaign.create.mockResolvedValue({ id: "camp_1", assets: [] } as never);
     stream.mockImplementation(async function* () {
       yield JSON.stringify(CONCEPTS);
@@ -310,6 +349,42 @@ describe("POST /api/campaigns/generate", () => {
       status: "draft",
     });
   });
+  it("queues a campaign.created webhook after saving", async () => {
+    campaign.create.mockResolvedValue({
+      id: "camp_1",
+      assets: [
+        { id: "asset_1", platform: "instagram" },
+        { id: "asset_2", platform: "instagram" },
+      ],
+    } as never);
+
+    await readEvents(
+      await generate(post("/api/campaigns/generate", validBody))
+    );
+
+    expect(queueWebhooks).toHaveBeenCalledWith(
+      prisma,
+      [
+        {
+          workspaceId: "ws_1",
+          event: "campaign.created",
+          data: {
+            brand: {
+              id: "brand_1",
+              name: "Acme Coffee",
+            },
+            campaign: {
+              id: "camp_1",
+              goal: "Launch cold brew",
+              assetCount: 2,
+              platforms: ["instagram"],
+            },
+          },
+        },
+      ]
+    );
+  });
+
   it("stores a null image prompt when the model omits one", async () => {
     stream.mockImplementation(async function* () {
       yield JSON.stringify({

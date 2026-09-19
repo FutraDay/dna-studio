@@ -23,6 +23,9 @@ vi.mock("@/lib/social/meta", () => ({
 }));
 vi.mock("@/lib/social/twitter", () => ({ publishToTwitter: vi.fn() }));
 vi.mock("@/lib/social/linkedin", () => ({ publishToLinkedIn: vi.fn() }));
+vi.mock("@/lib/webhooks/queue", () => ({
+  safeQueueWebhookEvents: vi.fn(),
+}));
 
 import { prisma } from "@/lib/db";
 import { requireSession } from "@/lib/auth/session";
@@ -31,11 +34,13 @@ import { publishToTwitter } from "@/lib/social/twitter";
 import { publishToLinkedIn } from "@/lib/social/linkedin";
 import { POST as schedule } from "@/app/api/campaigns/[id]/schedule/route";
 import { POST as publish } from "@/app/api/campaigns/[id]/publish/route";
+import { safeQueueWebhookEvents } from "@/lib/webhooks/queue";
 
 const campaign = vi.mocked(prisma.campaign);
 const asset = vi.mocked(prisma.asset);
 const connection = vi.mocked(prisma.socialConnection);
 const session = vi.mocked(requireSession);
+const queueWebhooks = vi.mocked(safeQueueWebhookEvents);
 
 const params = { params: Promise.resolve({ id: "camp_1" }) };
 const post = (body: unknown) =>
@@ -53,16 +58,28 @@ const makeAsset = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const makeCampaign = (assets = [makeAsset()]) => ({
+  id: "camp_1",
+  goal: "Launch",
+  brand: {
+    id: "brand_1",
+    name: "Acme Coffee",
+    workspaceId: "ws_1",
+  },
+  assets,
+});
+
 beforeEach(() => {
   session.mockResolvedValue({ user: { id: "user_1", email: "a@b.c" } } as never);
   asset.update.mockResolvedValue({} as never);
+  queueWebhooks.mockResolvedValue(0);
 });
 
 describe("POST /api/campaigns/[id]/schedule", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-25T12:00:00.000Z"));
-    campaign.findFirst.mockResolvedValue({ id: "camp_1", assets: [makeAsset()] } as never);
+    campaign.findFirst.mockResolvedValue(makeCampaign() as never);
   });
 
   afterEach(() => {
@@ -86,6 +103,28 @@ describe("POST /api/campaigns/[id]/schedule", () => {
       where: { id: "asset_1" },
       data: { status: "scheduled", scheduledAt: new Date(future) },
     });
+    expect(queueWebhooks).toHaveBeenCalledWith(prisma, [
+      {
+        workspaceId: "ws_1",
+        event: "post.scheduled",
+        data: {
+          brand: {
+            id: "brand_1",
+            name: "Acme Coffee",
+          },
+          campaign: {
+            id: "camp_1",
+            goal: "Launch",
+          },
+          post: {
+            id: "asset_1",
+            platform: "twitter",
+            status: "scheduled",
+            scheduledAt: future,
+          },
+        },
+      },
+    ]);
   });
 
   it("closes the queue connection when it is done", async () => {
@@ -146,7 +185,16 @@ describe("POST /api/campaigns/[id]/schedule", () => {
             },
           },
         },
-        include: { assets: { where: { id: { in: ["asset_1", "not_mine"] } } } },
+        include: {
+          assets: { where: { id: { in: ["asset_1", "not_mine"] } } },
+          brand: {
+            select: {
+              id: true,
+              name: true,
+              workspaceId: true,
+            },
+          },
+        },
       })
     );
     expect(queueAdd).toHaveBeenCalledTimes(1);
@@ -172,7 +220,7 @@ describe("POST /api/campaigns/[id]/publish", () => {
   });
 
   it("publishes a tweet and marks the asset published", async () => {
-    campaign.findFirst.mockResolvedValue({ id: "camp_1", assets: [makeAsset()] } as never);
+    campaign.findFirst.mockResolvedValue(makeCampaign() as never);
 
     const response = await publish(post({ assetIds: ["asset_1"] }), params);
 
@@ -192,16 +240,42 @@ describe("POST /api/campaigns/[id]/publish", () => {
         data: expect.objectContaining({
           status: "published",
           providerPostId: "t1",
+          publishedAt: expect.any(Date),
         }),
       })
+    );
+    expect(queueWebhooks).toHaveBeenCalledWith(
+      prisma,
+      [
+        expect.objectContaining({
+          workspaceId: "ws_1",
+          event: "post.published",
+          data: expect.objectContaining({
+            brand: {
+              id: "brand_1",
+              name: "Acme Coffee",
+            },
+            campaign: {
+              id: "camp_1",
+              goal: "Launch",
+            },
+            post: expect.objectContaining({
+              id: "asset_1",
+              platform: "twitter",
+              status: "published",
+              providerPostId: "t1",
+              publishedAt: expect.any(String),
+            }),
+          }),
+        }),
+      ]
     );
   });
 
   it("appends hashtags to the caption", async () => {
-    campaign.findFirst.mockResolvedValue({
-      id: "camp_1",
-      assets: [makeAsset({ hashtags: ["coffee", "mugs"] })],
-    } as never);
+    campaign.findFirst.mockResolvedValue(
+      makeCampaign([makeAsset({ hashtags: ["coffee", "mugs"] })]) as never
+    );
 
     await publish(post({ assetIds: ["asset_1"] }), params);
 
@@ -209,10 +283,9 @@ describe("POST /api/campaigns/[id]/publish", () => {
   });
 
   it("truncates a tweet to 280 characters", async () => {
-    campaign.findFirst.mockResolvedValue({
-      id: "camp_1",
-      assets: [makeAsset({ caption: "x".repeat(400) })],
-    } as never);
+    campaign.findFirst.mockResolvedValue(
+      makeCampaign([makeAsset({ caption: "x".repeat(400) })]) as never
+    );
 
     await publish(post({ assetIds: ["asset_1"] }), params);
 
@@ -224,10 +297,11 @@ describe("POST /api/campaigns/[id]/publish", () => {
     ["instagram", () => publishToInstagram],
     ["linkedin", () => publishToLinkedIn],
   ])("routes a %s asset to its publisher", async (platform, publisher) => {
-    campaign.findFirst.mockResolvedValue({
-      id: "camp_1",
-      assets: [makeAsset({ platform, imageUrl: "https://cdn/i.png" })],
-    } as never);
+    campaign.findFirst.mockResolvedValue(
+      makeCampaign([
+        makeAsset({ platform, imageUrl: "https://cdn/i.png" }),
+      ]) as never
+    );
 
     await publish(post({ assetIds: ["asset_1"] }), params);
 
@@ -235,7 +309,7 @@ describe("POST /api/campaigns/[id]/publish", () => {
   });
 
   it("reports a missing connection without calling any publisher", async () => {
-    campaign.findFirst.mockResolvedValue({ id: "camp_1", assets: [makeAsset()] } as never);
+    campaign.findFirst.mockResolvedValue(makeCampaign() as never);
     connection.findFirst.mockResolvedValue(null as never);
 
     const body = await (await publish(post({ assetIds: ["asset_1"] }), params)).json();
@@ -244,14 +318,41 @@ describe("POST /api/campaigns/[id]/publish", () => {
       { assetId: "asset_1", status: "failed", error: "No twitter account connected" },
     ]);
     expect(publishToTwitter).not.toHaveBeenCalled();
-    expect(asset.update).not.toHaveBeenCalled();
+    expect(asset.update).toHaveBeenCalledWith({
+      where: { id: "asset_1" },
+      data: { status: "failed" },
+    });
+    expect(queueWebhooks).toHaveBeenCalledWith(prisma, [
+      {
+        workspaceId: "ws_1",
+        event: "post.failed",
+        data: {
+          brand: {
+            id: "brand_1",
+            name: "Acme Coffee",
+          },
+          campaign: {
+            id: "camp_1",
+            goal: "Launch",
+          },
+          post: {
+            id: "asset_1",
+            platform: "twitter",
+            status: "failed",
+          },
+          error: "No twitter account connected",
+        },
+      },
+    ]);
   });
 
   it("marks the asset failed and keeps going when a publisher throws", async () => {
-    campaign.findFirst.mockResolvedValue({
-      id: "camp_1",
-      assets: [makeAsset({ id: "a1" }), makeAsset({ id: "a2" })],
-    } as never);
+    campaign.findFirst.mockResolvedValue(
+      makeCampaign([
+        makeAsset({ id: "a1" }),
+        makeAsset({ id: "a2" }),
+      ]) as never
+    );
     vi.mocked(publishToTwitter)
       .mockRejectedValueOnce(new Error("rate limited"))
       .mockResolvedValueOnce({ id: "t2" } as never);
@@ -264,7 +365,7 @@ describe("POST /api/campaigns/[id]/publish", () => {
   });
 
   it("looks up the connection for the signed-in user and the asset's platform", async () => {
-    campaign.findFirst.mockResolvedValue({ id: "camp_1", assets: [makeAsset()] } as never);
+    campaign.findFirst.mockResolvedValue(makeCampaign() as never);
 
     await publish(post({ assetIds: ["asset_1"] }), params);
 

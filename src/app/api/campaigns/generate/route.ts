@@ -8,6 +8,7 @@ import { formatCampaignQualityError, validateCampaignQuality } from "@/lib/campa
 import { normalizeCampaignStyle, repairCampaignDeterministically } from "@/lib/campaigns/style-normalizer";
 import type { BrandDNA } from "@/lib/brand-dna/types";
 import { brandAccessWhere } from "@/lib/workspaces/access";
+import { safeQueueWebhookEvents } from "@/lib/webhooks/queue";
 
 const generateSchema = z.object({
   brandId: z.string(),
@@ -153,6 +154,27 @@ export async function POST(request: Request) {
             },
             include: { assets: true },
           });
+
+          await safeQueueWebhookEvents(prisma, [
+            {
+              workspaceId: brand.workspaceId,
+              event: "campaign.created",
+              data: {
+                brand: {
+                  id: brand.id,
+                  name: brand.name,
+                },
+                campaign: {
+                  id: campaign.id,
+                  goal,
+                  assetCount: campaign.assets.length,
+                  platforms: Array.from(
+                    new Set(campaign.assets.map((asset) => asset.platform))
+                  ),
+                },
+              },
+            },
+          ]);
 
           controller.enqueue(
             encoder.encode(

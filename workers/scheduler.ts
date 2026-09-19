@@ -1,6 +1,8 @@
 import { Worker } from "bullmq";
 import { PrismaClient } from "@prisma/client";
 import { extractProviderPostId } from "../src/lib/analytics/metrics";
+import { processWebhookDelivery } from "../src/lib/webhooks/worker";
+import { safeQueueWebhookEvents } from "../src/lib/webhooks/queue";
 
 const prisma = new PrismaClient();
 
@@ -27,11 +29,34 @@ const worker = new Worker(
     });
 
     if (!connection) {
+      const message = `No ${asset.platform} connection for user ${userId}`;
       await prisma.asset.update({
         where: { id: assetId },
         data: { status: "failed" },
       });
-      throw new Error(`No ${asset.platform} connection for user ${userId}`);
+      await safeQueueWebhookEvents(prisma, [
+        {
+          workspaceId: asset.campaign.brand.workspaceId,
+          event: "post.failed",
+          data: {
+            brand: {
+              id: asset.campaign.brand.id,
+              name: asset.campaign.brand.name,
+            },
+            campaign: {
+              id: asset.campaign.id,
+              goal: asset.campaign.goal,
+            },
+            post: {
+              id: asset.id,
+              platform: asset.platform,
+              status: "failed",
+            },
+            error: message,
+          },
+        },
+      ]);
+      throw new Error(message);
     }
 
     try {
@@ -88,21 +113,70 @@ const worker = new Worker(
         result,
         asset.platform
       );
+      const publishedAt = new Date();
       await prisma.asset.update({
         where: { id: assetId },
         data: {
           status: "published",
-          publishedAt: new Date(),
+          publishedAt,
           ...(providerPostId ? { providerPostId } : {}),
         },
       });
 
+      await safeQueueWebhookEvents(prisma, [
+        {
+          workspaceId: asset.campaign.brand.workspaceId,
+          event: "post.published",
+          data: {
+            brand: {
+              id: asset.campaign.brand.id,
+              name: asset.campaign.brand.name,
+            },
+            campaign: {
+              id: asset.campaign.id,
+              goal: asset.campaign.goal,
+            },
+            post: {
+              id: asset.id,
+              platform: asset.platform,
+              status: "published",
+              providerPostId: providerPostId ?? null,
+              publishedAt: publishedAt.toISOString(),
+            },
+          },
+        },
+      ]);
+
       console.log(`Asset ${assetId} published successfully`);
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Publish failed";
       await prisma.asset.update({
         where: { id: assetId },
         data: { status: "failed" },
       });
+      await safeQueueWebhookEvents(prisma, [
+        {
+          workspaceId: asset.campaign.brand.workspaceId,
+          event: "post.failed",
+          data: {
+            brand: {
+              id: asset.campaign.brand.id,
+              name: asset.campaign.brand.name,
+            },
+            campaign: {
+              id: asset.campaign.id,
+              goal: asset.campaign.goal,
+            },
+            post: {
+              id: asset.id,
+              platform: asset.platform,
+              status: "failed",
+            },
+            error: message,
+          },
+        },
+      ]);
       throw error;
     }
   },
@@ -123,4 +197,40 @@ worker.on("failed", (job, err) => {
   console.error(`Job ${job?.id} failed:`, err.message);
 });
 
-console.log("DNA Studio worker started. Waiting for jobs...");
+const webhookWorker = new Worker(
+  "webhook-delivery",
+  async (job) => {
+    const { deliveryId } = job.data as { deliveryId: string };
+    const maxAttempts =
+      typeof job.opts.attempts === "number" ? job.opts.attempts : 3;
+
+    await processWebhookDelivery(
+      prisma,
+      deliveryId,
+      job.attemptsMade,
+      maxAttempts
+    );
+  },
+  {
+    connection: {
+      host: redisUrl.hostname,
+      port: parseInt(redisUrl.port || "6379"),
+    },
+    concurrency: 5,
+  }
+);
+
+webhookWorker.on("completed", (job) => {
+  console.log(`Webhook delivery job ${job.id} completed`);
+});
+
+webhookWorker.on("failed", (job, err) => {
+  console.error(
+    `Webhook delivery job ${job?.id} failed:`,
+    err.message
+  );
+});
+
+console.log(
+  "DNA Studio worker started. Waiting for publish and webhook jobs..."
+);

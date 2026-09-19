@@ -71,6 +71,7 @@ model Workspace {
   owner     User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   members   WorkspaceMember[]
   brands    Brand[]
+  webhooks  WebhookEndpoint[]
 
   @@index([ownerId])
 }
@@ -216,6 +217,41 @@ model UGCVideo {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WebhookEndpoint {
+  id          String            @id @default(cuid())
+  workspaceId String
+  name        String
+  provider    String
+  url         String            @db.Text
+  secret      String            @db.Text
+  events      String[]
+  enabled     Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  deliveries  WebhookDelivery[]
+
+  @@index([workspaceId])
+}
+
+model WebhookDelivery {
+  id             String          @id @default(cuid())
+  webhookId      String
+  event          String
+  payload        Json
+  status         String          @default("pending")
+  attempts       Int             @default(0)
+  responseStatus Int?
+  error          String?         @db.Text
+  deliveredAt    DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  webhook        WebhookEndpoint @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, createdAt])
+  @@index([status, createdAt])
 }
 
 model SocialConnection {

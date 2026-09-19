@@ -4,6 +4,8 @@ import { requireSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { Queue } from "bullmq";
 import { campaignAccessWhere } from "@/lib/workspaces/access";
+import { safeQueueWebhookEvents } from "@/lib/webhooks/queue";
+import type { WebhookDispatch } from "@/lib/webhooks/events";
 
 const scheduleSchema = z.object({
   assetIds: z.array(z.string()),
@@ -31,7 +33,16 @@ export async function POST(
 
     const campaign = await prisma.campaign.findFirst({
       where: campaignAccessWhere(session.user.id, id),
-      include: { assets: { where: { id: { in: assetIds } } } },
+      include: {
+        assets: { where: { id: { in: assetIds } } },
+        brand: {
+          select: {
+            id: true,
+            name: true,
+            workspaceId: true,
+          },
+        },
+      },
     });
 
     if (!campaign) {
@@ -52,6 +63,7 @@ export async function POST(
     }
 
     const queue = getQueue();
+    const webhookEvents: WebhookDispatch[] = [];
 
     for (const asset of campaign.assets) {
       await queue.add(
@@ -68,9 +80,31 @@ export async function POST(
         where: { id: asset.id },
         data: { status: "scheduled", scheduledAt: scheduledDate },
       });
+
+      webhookEvents.push({
+        workspaceId: campaign.brand.workspaceId,
+        event: "post.scheduled",
+        data: {
+          brand: {
+            id: campaign.brand.id,
+            name: campaign.brand.name,
+          },
+          campaign: {
+            id: campaign.id,
+            goal: campaign.goal,
+          },
+          post: {
+            id: asset.id,
+            platform: asset.platform,
+            status: "scheduled",
+            scheduledAt: scheduledDate.toISOString(),
+          },
+        },
+      });
     }
 
     await queue.close();
+    await safeQueueWebhookEvents(prisma, webhookEvents);
 
     return NextResponse.json({
       scheduled: campaign.assets.length,

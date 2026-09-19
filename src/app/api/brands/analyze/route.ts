@@ -7,6 +7,7 @@ import {
   ensurePersonalWorkspace,
   requireWorkspaceRole,
 } from "@/lib/workspaces/access";
+import { safeQueueWebhookEvents } from "@/lib/webhooks/queue";
 
 const analyzeSchema = z.object({
   url: z.string().url(),
@@ -66,6 +67,23 @@ export async function POST(request: Request) {
               audience: dna.audience.primary,
             },
           });
+
+          await safeQueueWebhookEvents(prisma, [
+            {
+              workspaceId: targetWorkspaceId,
+              event: "brand.created",
+              data: {
+                brand: {
+                  id: brand.id,
+                  name: dna.name,
+                  url: dna.url,
+                  industry: dna.industry,
+                  category: dna.category,
+                  tone: dna.tone.primary,
+                },
+              },
+            },
+          ]);
 
           controller.enqueue(
             encoder.encode(
