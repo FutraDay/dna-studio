@@ -84,6 +84,10 @@ describe("Sidebar", () => {
       "href",
       "/analytics"
     );
+    expect(screen.getByRole("link", { name: /calendar/i })).toHaveAttribute(
+      "href",
+      "/calendar"
+    );
     expect(fetch).toHaveBeenCalledWith("/api/brands");
   });
 
