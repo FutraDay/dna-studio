@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
+import { campaignAccessWhere } from "@/lib/workspaces/access";
 
 const preferredSchema = z.object({
   preferredCampaignId: z.string().min(1),
@@ -19,7 +20,10 @@ const variantSelect = {
 
 async function listVariants(userId: string, experimentId: string) {
   return prisma.campaign.findMany({
-    where: { userId, experimentId },
+    where: {
+      experimentId,
+      ...campaignAccessWhere(userId),
+    },
     orderBy: { variantLabel: "asc" },
     select: variantSelect,
   });
@@ -34,7 +38,7 @@ export async function POST(
     const { id } = await params;
 
     const source = await prisma.campaign.findFirst({
-      where: { id, userId: session.user.id },
+      where: campaignAccessWhere(session.user.id, id),
       include: { assets: true },
     });
 
@@ -79,7 +83,7 @@ export async function POST(
     const variantCreate = prisma.campaign.create({
       data: {
         brandId: source.brandId,
-        userId: source.userId,
+        userId: session.user.id,
         goal: source.goal,
         concepts: source.concepts as Prisma.InputJsonValue,
         experimentId,
@@ -126,7 +130,7 @@ export async function POST(
         const session = await requireSession();
         const { id } = await params;
         const campaign = await prisma.campaign.findFirst({
-          where: { id, userId: session.user.id },
+          where: campaignAccessWhere(session.user.id, id),
         });
         if (campaign?.experimentId) {
           const variants = await listVariants(
@@ -169,7 +173,7 @@ export async function PATCH(
     const body = preferredSchema.parse(await request.json());
 
     const current = await prisma.campaign.findFirst({
-      where: { id, userId: session.user.id },
+      where: campaignAccessWhere(session.user.id, id),
       select: { experimentId: true },
     });
 
@@ -190,8 +194,8 @@ export async function PATCH(
     const preferred = await prisma.campaign.findFirst({
       where: {
         id: body.preferredCampaignId,
-        userId: session.user.id,
         experimentId: current.experimentId,
+        ...campaignAccessWhere(session.user.id),
       },
       select: { id: true },
     });
@@ -206,8 +210,8 @@ export async function PATCH(
     await prisma.$transaction([
       prisma.campaign.updateMany({
         where: {
-          userId: session.user.id,
           experimentId: current.experimentId,
+          ...campaignAccessWhere(session.user.id),
         },
         data: { isPreferredVariant: false },
       }),

@@ -88,7 +88,16 @@ describe("GET /api/campaigns/[id]", () => {
 
     expect(campaign.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "camp_1", userId: "user_1" },
+        where: {
+          id: "camp_1",
+          brand: {
+            workspace: {
+              members: {
+                some: { userId: "user_1" },
+              },
+            },
+          },
+        },
       })
     );
 

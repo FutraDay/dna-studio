@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
+import { campaignAccessWhere } from "@/lib/workspaces/access";
 
 type ConceptAsset = {
   platform?: string;
@@ -80,7 +81,7 @@ export async function GET(
     const { id } = await params;
 
     const campaign = await prisma.campaign.findFirst({
-      where: { id, userId: session.user.id },
+      where: campaignAccessWhere(session.user.id, id),
       include: {
         brand: true,
         assets: { orderBy: { platform: "asc" } },
@@ -98,8 +99,8 @@ export async function GET(
     const experimentVariants = campaign.experimentId
       ? await prisma.campaign.findMany({
           where: {
-            userId: session.user.id,
             experimentId: campaign.experimentId,
+            ...campaignAccessWhere(session.user.id),
           },
           orderBy: { variantLabel: "asc" },
           select: {
@@ -178,7 +179,7 @@ export async function PATCH(
     }
 
     const campaign = await prisma.campaign.findFirst({
-      where: { id, userId: session.user.id },
+      where: campaignAccessWhere(session.user.id, id),
       include: { assets: true },
     });
 

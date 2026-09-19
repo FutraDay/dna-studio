@@ -6,6 +6,7 @@ import { publishToFacebook, publishToInstagram } from "@/lib/social/meta";
 import { publishToTwitter } from "@/lib/social/twitter";
 import { publishToLinkedIn } from "@/lib/social/linkedin";
 import { extractProviderPostId } from "@/lib/analytics/metrics";
+import { campaignAccessWhere } from "@/lib/workspaces/access";
 
 const publishSchema = z.object({
   assetIds: z.array(z.string()),
@@ -22,7 +23,7 @@ export async function POST(
     const { assetIds } = publishSchema.parse(body);
 
     const campaign = await prisma.campaign.findFirst({
-      where: { id, userId: session.user.id },
+      where: campaignAccessWhere(session.user.id, id),
       include: { assets: { where: { id: { in: assetIds } } } },
     });
 

@@ -247,7 +247,7 @@ dna-studio/
 - [x] UGC video generation with creator avatars (Veo, HeyGen, D-ID)
 - [x] Health endpoint (`/api/health`) and container healthcheck
 - [x] CI on every pull request — migrations, entrypoint, build, and a full `docker compose` boot
-- [x] Test suite — 703 tests across the library, API routes, analytics, calendar, and key React UI flows, with a coverage gate in CI
+- [x] Test suite — 730 tests across the library, API routes, analytics, calendar, team collaboration, and key React UI flows, with a coverage gate in CI
 
 ### Up Next
 
@@ -256,7 +256,7 @@ dna-studio/
 - [x] A/B testing for campaign variants — zero-credit Variant B cloning, independent drafts, switching, and manual preferred-variant selection
 - [x] Analytics dashboard — provider post-ID capture, metric snapshots, brand/platform reporting, post-level performance, refresh, and A/B comparison
 - [x] Calendar view for scheduled posts — month navigation, brand/platform filters, scheduled/published/failed history, overdue detection, and campaign links
-- [ ] Team collaboration (multi-user workspaces)
+- [x] Team collaboration — shared workspaces, owner/admin/member roles, shared brand/campaign access, collaborator-safe publishing credentials, and registered-user team management
 - [ ] Brand style guide PDF export
 - [ ] Webhook integrations (Zapier, n8n)
 - [ ] Chrome extension for one-click brand analysis

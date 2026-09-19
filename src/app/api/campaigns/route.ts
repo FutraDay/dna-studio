@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
+import { campaignAccessWhere } from "@/lib/workspaces/access";
 
 export async function GET() {
   try {
     const session = await requireSession();
 
     const campaigns = await prisma.campaign.findMany({
-      where: { userId: session.user.id },
+      where: campaignAccessWhere(session.user.id),
       orderBy: { createdAt: "desc" },
       include: {
         brand: { select: { name: true, colors: true } },

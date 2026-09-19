@@ -22,6 +22,8 @@ model User {
   photoshoots   Photoshoot[]
   ugcVideos     UGCVideo[]
   connections   SocialConnection[]
+  ownedWorkspaces Workspace[]       @relation("WorkspaceOwner")
+  workspaceMemberships WorkspaceMember[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -60,10 +62,37 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-model Brand {
-  id        String     @id @default(cuid())
-  userId    String
+model Workspace {
+  id        String            @id @default(cuid())
   name      String
+  ownerId   String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  owner     User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members   WorkspaceMember[]
+  brands    Brand[]
+
+  @@index([ownerId])
+}
+
+model WorkspaceMember {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        String    @default("member")
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+model Brand {
+  id          String     @id @default(cuid())
+  userId      String
+  workspaceId String
+  name        String
   url       String
   dna       Json
   logoUrl   String?
@@ -77,6 +106,9 @@ model Brand {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
 }
 
 model Campaign {
@@ -95,7 +127,7 @@ model Campaign {
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, experimentId])
-  @@unique([userId, experimentId, variantLabel])
+  @@unique([experimentId, variantLabel])
 }
 
 model Asset {

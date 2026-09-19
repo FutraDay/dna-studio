@@ -106,7 +106,16 @@ describe("POST /api/campaigns/[id]/variants", () => {
     expect(body.variant.id).toBe("camp_b");
 
     expect(campaign.findFirst).toHaveBeenCalledWith({
-      where: { id: "camp_a", userId: "user_1" },
+      where: {
+        id: "camp_a",
+        brand: {
+          workspace: {
+            members: {
+              some: { userId: "user_1" },
+            },
+          },
+        },
+      },
       include: { assets: true },
     });
 
@@ -114,6 +123,7 @@ describe("POST /api/campaigns/[id]/variants", () => {
       data: {
         experimentId: string;
         variantLabel: string;
+        userId: string;
         assets: {
           create: Array<{
             caption: string;
@@ -128,6 +138,7 @@ describe("POST /api/campaigns/[id]/variants", () => {
 
     expect(createArgs.data.experimentId).toEqual(expect.any(String));
     expect(createArgs.data.variantLabel).toBe("B");
+    expect(createArgs.data.userId).toBe("user_1");
     expect(createArgs.data.assets.create).toEqual([
       expect.objectContaining({
         caption: "Control copy",
@@ -213,7 +224,16 @@ describe("PATCH /api/campaigns/[id]/variants", () => {
 
     expect(response.status).toBe(200);
     expect(campaign.updateMany).toHaveBeenCalledWith({
-      where: { userId: "user_1", experimentId: "exp_1" },
+      where: {
+        experimentId: "exp_1",
+        brand: {
+          workspace: {
+            members: {
+              some: { userId: "user_1" },
+            },
+          },
+        },
+      },
       data: { isPreferredVariant: false },
     });
     expect(campaign.update).toHaveBeenCalledWith({

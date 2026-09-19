@@ -7,6 +7,16 @@ vi.mock("@/lib/db", () => {
 vi.mock("@/lib/auth/session", () => ({ requireSession: vi.fn(), getSession: vi.fn() }));
 vi.mock("@/lib/brand-dna/crawler", () => ({ crawlBrandDNA: vi.fn() }));
 vi.mock("@/lib/campaigns/generator", () => ({ streamCampaign: vi.fn(), repairCampaign: vi.fn() }));
+vi.mock("@/lib/workspaces/access", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/workspaces/access")
+  >("@/lib/workspaces/access");
+  return {
+    ...actual,
+    ensurePersonalWorkspace: vi.fn(),
+    requireWorkspaceRole: vi.fn(),
+  };
+});
 
 import { prisma } from "@/lib/db";
 import { requireSession } from "@/lib/auth/session";
@@ -15,6 +25,10 @@ import { repairCampaign, streamCampaign } from "@/lib/campaigns/generator";
 import { POST as analyze } from "@/app/api/brands/analyze/route";
 import { POST as generate } from "@/app/api/campaigns/generate/route";
 import { makeBrandDNA } from "../fixtures/brand-dna";
+import {
+  ensurePersonalWorkspace,
+  requireWorkspaceRole,
+} from "@/lib/workspaces/access";
 
 const brand = vi.mocked(prisma.brand);
 const campaign = vi.mocked(prisma.campaign);
@@ -22,6 +36,8 @@ const session = vi.mocked(requireSession);
 const crawl = vi.mocked(crawlBrandDNA);
 const stream = vi.mocked(streamCampaign);
 const repair = vi.mocked(repairCampaign);
+const ensureWorkspace = vi.mocked(ensurePersonalWorkspace);
+const workspaceRole = vi.mocked(requireWorkspaceRole);
 
 const post = (url: string, body: unknown) =>
   new Request(`http://localhost${url}`, { method: "POST", body: JSON.stringify(body) });
@@ -37,6 +53,19 @@ async function readEvents(response: Response) {
 
 beforeEach(() => {
   session.mockResolvedValue({ user: { id: "user_1", email: "a@b.c" } } as never);
+  ensureWorkspace.mockResolvedValue({
+    id: "ws_1",
+    name: "Personal Workspace",
+  } as never);
+  workspaceRole.mockResolvedValue({
+    id: "membership_1",
+    role: "owner",
+    workspace: {
+      id: "ws_1",
+      name: "Personal Workspace",
+      ownerId: "user_1",
+    },
+  } as never);
 });
 
 describe("POST /api/brands/analyze", () => {
@@ -92,6 +121,7 @@ describe("POST /api/brands/analyze", () => {
     expect(brand.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         userId: "user_1",
+        workspaceId: "ws_1",
         name: "Acme Coffee",
         colors: ["#6F4E37", "#C0A080"],
         fonts: ["Playfair Display", "Inter"],
@@ -100,6 +130,57 @@ describe("POST /api/brands/analyze", () => {
         audience: "Home brewers",
       }),
     });
+  });
+
+  it("places a new brand in an explicitly selected managed workspace", async () => {
+    workspaceRole.mockResolvedValue({
+      id: "membership_team",
+      role: "admin",
+      workspace: {
+        id: "ws_team",
+        name: "Team Workspace",
+        ownerId: "owner_2",
+      },
+    } as never);
+
+    await readEvents(
+      await analyze(
+        post("/api/brands/analyze", {
+          url: "https://acme.coffee",
+          workspaceId: "ws_team",
+        })
+      )
+    );
+
+    expect(workspaceRole).toHaveBeenCalledWith(
+      "user_1",
+      "ws_team",
+      ["owner", "admin"]
+    );
+    expect(brand.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: "user_1",
+        workspaceId: "ws_team",
+      }),
+    });
+  });
+
+  it("rejects brand placement when the user cannot manage that workspace", async () => {
+    workspaceRole.mockResolvedValue(null as never);
+
+    const response = await analyze(
+      post("/api/brands/analyze", {
+        url: "https://acme.coffee",
+        workspaceId: "ws_team",
+      })
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "Owner or admin permission required for that workspace",
+    });
+    expect(crawl).not.toHaveBeenCalled();
+    expect(brand.create).not.toHaveBeenCalled();
   });
 
   it("reports a crawl failure as an error event rather than a broken stream", async () => {

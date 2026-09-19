@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { Queue } from "bullmq";
+import { campaignAccessWhere } from "@/lib/workspaces/access";
 
 const scheduleSchema = z.object({
   assetIds: z.array(z.string()),
@@ -29,7 +30,7 @@ export async function POST(
     const { assetIds, scheduledAt } = scheduleSchema.parse(body);
 
     const campaign = await prisma.campaign.findFirst({
-      where: { id, userId: session.user.id },
+      where: campaignAccessWhere(session.user.id, id),
       include: { assets: { where: { id: { in: assetIds } } } },
     });
 

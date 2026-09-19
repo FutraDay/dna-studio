@@ -112,7 +112,15 @@ describe("GET /api/analytics", () => {
       expect.objectContaining({
         where: {
           status: "published",
-          campaign: { userId: "user_1" },
+          campaign: {
+            brand: {
+              workspace: {
+                members: {
+                  some: { userId: "user_1" },
+                },
+              },
+            },
+          },
         },
       })
     );
@@ -144,14 +152,30 @@ describe("GET /api/analytics", () => {
     );
 
     expect(brand.findFirst).toHaveBeenCalledWith({
-      where: { id: "brand_1", userId: "user_1" },
+      where: {
+        id: "brand_1",
+        workspace: {
+          members: {
+            some: { userId: "user_1" },
+          },
+        },
+      },
       select: { id: true },
     });
     expect(asset.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
           status: "published",
-          campaign: { userId: "user_1", brandId: "brand_1" },
+          campaign: {
+            brandId: "brand_1",
+            brand: {
+              workspace: {
+                members: {
+                  some: { userId: "user_1" },
+                },
+              },
+            },
+          },
         },
       })
     );
@@ -306,14 +330,30 @@ describe("POST /api/analytics/refresh", () => {
     await POST(request({ brandId: "brand_1" }));
 
     expect(brand.findFirst).toHaveBeenCalledWith({
-      where: { id: "brand_1", userId: "user_1" },
+      where: {
+        id: "brand_1",
+        workspace: {
+          members: {
+            some: { userId: "user_1" },
+          },
+        },
+      },
       select: { id: true },
     });
     expect(asset.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
           status: "published",
-          campaign: { userId: "user_1", brandId: "brand_1" },
+          campaign: {
+            brandId: "brand_1",
+            brand: {
+              workspace: {
+                members: {
+                  some: { userId: "user_1" },
+                },
+              },
+            },
+          },
         },
       })
     );

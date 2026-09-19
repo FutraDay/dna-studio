@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
+import {
+  brandAccessWhere,
+  campaignAccessWhere,
+} from "@/lib/workspaces/access";
 
 const calendarQuerySchema = z.object({
   start: z.string().datetime(),
@@ -43,7 +47,7 @@ export async function GET(request: Request) {
 
     if (query.brandId) {
       const brand = await prisma.brand.findFirst({
-        where: { id: query.brandId, userId: session.user.id },
+        where: brandAccessWhere(session.user.id, query.brandId),
         select: { id: true },
       });
 
@@ -54,7 +58,7 @@ export async function GET(request: Request) {
 
     const [brands, assets] = await Promise.all([
       prisma.brand.findMany({
-        where: { userId: session.user.id },
+        where: brandAccessWhere(session.user.id),
         orderBy: { name: "asc" },
         select: { id: true, name: true },
       }),
@@ -66,7 +70,7 @@ export async function GET(request: Request) {
           },
           ...(query.platform ? { platform: query.platform } : {}),
           campaign: {
-            userId: session.user.id,
+            ...campaignAccessWhere(session.user.id),
             ...(query.brandId ? { brandId: query.brandId } : {}),
           },
         },

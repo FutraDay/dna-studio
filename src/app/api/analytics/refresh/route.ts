@@ -3,6 +3,10 @@ import { z } from "zod";
 import { requireSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { fetchPostMetrics } from "@/lib/analytics/providers";
+import {
+  brandAccessWhere,
+  campaignAccessWhere,
+} from "@/lib/workspaces/access";
 
 const refreshSchema = z.object({
   brandId: z.string().min(1).optional(),
@@ -17,7 +21,7 @@ export async function POST(request: Request) {
 
     if (body.brandId) {
       const brand = await prisma.brand.findFirst({
-        where: { id: body.brandId, userId: session.user.id },
+        where: brandAccessWhere(session.user.id, body.brandId),
         select: { id: true },
       });
       if (!brand) {
@@ -30,7 +34,7 @@ export async function POST(request: Request) {
         where: {
           status: "published",
           campaign: {
-            userId: session.user.id,
+            ...campaignAccessWhere(session.user.id),
             ...(body.brandId ? { brandId: body.brandId } : {}),
           },
         },

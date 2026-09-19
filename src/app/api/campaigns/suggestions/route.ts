@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { generateJSON, type LLMMessage } from "@/lib/llm/client";
 import type { BrandDNA } from "@/lib/brand-dna/types";
+import { brandAccessWhere } from "@/lib/workspaces/access";
 
 interface Suggestion {
   title: string;
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
     }
 
     const brand = await prisma.brand.findFirst({
-      where: { id: brandId, userId: session.user.id },
+      where: brandAccessWhere(session.user.id, brandId),
     });
 
     if (!brand) {
@@ -120,7 +121,7 @@ export async function PATCH(request: Request) {
     }
 
     const brand = await prisma.brand.findFirst({
-      where: { id: brandId, userId: session.user.id },
+      where: brandAccessWhere(session.user.id, brandId),
     });
 
     if (!brand?.suggestions) {

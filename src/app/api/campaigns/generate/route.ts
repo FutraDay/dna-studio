@@ -7,6 +7,7 @@ import { repairCampaign, streamCampaign, type GeneratedCampaign } from "@/lib/ca
 import { formatCampaignQualityError, validateCampaignQuality } from "@/lib/campaigns/quality";
 import { normalizeCampaignStyle, repairCampaignDeterministically } from "@/lib/campaigns/style-normalizer";
 import type { BrandDNA } from "@/lib/brand-dna/types";
+import { brandAccessWhere } from "@/lib/workspaces/access";
 
 const generateSchema = z.object({
   brandId: z.string(),
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
     const { brandId, goal, platforms, language } = generateSchema.parse(body);
 
     const brand = await prisma.brand.findFirst({
-      where: { id: brandId, userId: session.user.id },
+      where: brandAccessWhere(session.user.id, brandId),
     });
 
     if (!brand) {

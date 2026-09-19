@@ -15,9 +15,19 @@ vi.mock("@/lib/auth/session", () => ({
   requireSession: vi.fn(),
   getSession: vi.fn(),
 }));
+vi.mock("@/lib/workspaces/access", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/workspaces/access")
+  >("@/lib/workspaces/access");
+  return {
+    ...actual,
+    requireWorkspaceRole: vi.fn(),
+  };
+});
 
 import { prisma } from "@/lib/db";
 import { requireSession } from "@/lib/auth/session";
+import { requireWorkspaceRole } from "@/lib/workspaces/access";
 import { GET as listBrands } from "@/app/api/brands/route";
 import {
   GET as getBrand,
@@ -27,6 +37,7 @@ import {
 
 const brand = vi.mocked(prisma.brand);
 const session = vi.mocked(requireSession);
+const workspaceRole = vi.mocked(requireWorkspaceRole);
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 const patchRequest = (body: unknown) =>
@@ -39,6 +50,15 @@ const UNAUTHORIZED = new Error("Unauthorized");
 
 beforeEach(() => {
   session.mockResolvedValue({ user: { id: "user_1", email: "a@b.c" } } as never);
+  workspaceRole.mockResolvedValue({
+    id: "membership_1",
+    role: "owner",
+    workspace: {
+      id: "ws_1",
+      name: "Workspace",
+      ownerId: "user_1",
+    },
+  } as never);
 });
 
 describe("GET /api/brands", () => {
@@ -51,7 +71,13 @@ describe("GET /api/brands", () => {
     await expect(response.json()).resolves.toEqual([{ id: "brand_1" }]);
     expect(brand.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { userId: "user_1" },
+        where: {
+          workspace: {
+            members: {
+              some: { userId: "user_1" },
+            },
+          },
+        },
         orderBy: { createdAt: "desc" },
       })
     );
@@ -85,7 +111,16 @@ describe("GET /api/brands/[id]", () => {
 
     expect(response.status).toBe(200);
     expect(brand.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: "brand_1", userId: "user_1" } })
+      expect.objectContaining({
+        where: {
+          id: "brand_1",
+          workspace: {
+            members: {
+              some: { userId: "user_1" },
+            },
+          },
+        },
+      })
     );
   });
 
@@ -177,7 +212,10 @@ describe("PATCH /api/brands/[id]", () => {
 
 describe("DELETE /api/brands/[id]", () => {
   it("deletes a brand the user owns", async () => {
-    brand.findFirst.mockResolvedValue({ id: "brand_1" } as never);
+    brand.findFirst.mockResolvedValue({
+      id: "brand_1",
+      workspaceId: "ws_1",
+    } as never);
     brand.delete.mockResolvedValue({} as never);
 
     const response = await deleteBrand(new Request("http://localhost"), params("brand_1"));
@@ -185,6 +223,22 @@ describe("DELETE /api/brands/[id]", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true });
     expect(brand.delete).toHaveBeenCalledWith({ where: { id: "brand_1" } });
+  });
+
+  it("blocks a regular member from deleting a shared brand", async () => {
+    brand.findFirst.mockResolvedValue({
+      id: "brand_1",
+      workspaceId: "ws_1",
+    } as never);
+    workspaceRole.mockResolvedValue(null as never);
+
+    const response = await deleteBrand(
+      new Request("http://localhost"),
+      params("brand_1")
+    );
+
+    expect(response.status).toBe(403);
+    expect(brand.delete).not.toHaveBeenCalled();
   });
 
   it("answers 404 without deleting when the brand is not the user's", async () => {

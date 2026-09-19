@@ -127,7 +127,15 @@ describe("GET /api/calendar", () => {
             gte: new Date("2026-09-01T00:00:00.000Z"),
             lt: new Date("2026-10-01T00:00:00.000Z"),
           },
-          campaign: { userId: "user_1" },
+          campaign: {
+            brand: {
+              workspace: {
+                members: {
+                  some: { userId: "user_1" },
+                },
+              },
+            },
+          },
         },
       })
     );
@@ -150,7 +158,14 @@ describe("GET /api/calendar", () => {
     await GET(makeRequest("&brandId=brand_1&platform=linkedin"));
 
     expect(brand.findFirst).toHaveBeenCalledWith({
-      where: { id: "brand_1", userId: "user_1" },
+      where: {
+        id: "brand_1",
+        workspace: {
+          members: {
+            some: { userId: "user_1" },
+          },
+        },
+      },
       select: { id: true },
     });
     expect(asset.findMany).toHaveBeenCalledWith(
@@ -159,8 +174,14 @@ describe("GET /api/calendar", () => {
           scheduledAt: expect.any(Object),
           platform: "linkedin",
           campaign: {
-            userId: "user_1",
             brandId: "brand_1",
+            brand: {
+              workspace: {
+                members: {
+                  some: { userId: "user_1" },
+                },
+              },
+            },
           },
         },
       })

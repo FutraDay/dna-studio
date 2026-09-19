@@ -7,6 +7,10 @@ import {
   engagementRate,
   type NormalizedPostMetrics,
 } from "@/lib/analytics/metrics";
+import {
+  brandAccessWhere,
+  campaignAccessWhere,
+} from "@/lib/workspaces/access";
 
 function metricsFromSnapshot(
   snapshot:
@@ -40,7 +44,7 @@ export async function GET(request: Request) {
 
     if (brandId) {
       const brand = await prisma.brand.findFirst({
-        where: { id: brandId, userId: session.user.id },
+        where: brandAccessWhere(session.user.id, brandId),
         select: { id: true },
       });
       if (!brand) {
@@ -50,7 +54,7 @@ export async function GET(request: Request) {
 
     const [brands, assets] = await Promise.all([
       prisma.brand.findMany({
-        where: { userId: session.user.id },
+        where: brandAccessWhere(session.user.id),
         orderBy: { name: "asc" },
         select: { id: true, name: true },
       }),
@@ -58,7 +62,7 @@ export async function GET(request: Request) {
         where: {
           status: "published",
           campaign: {
-            userId: session.user.id,
+            ...campaignAccessWhere(session.user.id),
             ...(brandId ? { brandId } : {}),
           },
         },

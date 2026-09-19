@@ -13,6 +13,7 @@
     "smoke:campaign-ab": "tsx scripts/campaign-ab-smoke.ts",
     "smoke:analytics": "tsx scripts/analytics-smoke.ts",
     "smoke:calendar": "tsx scripts/calendar-smoke.ts",
+    "smoke:workspace": "tsx scripts/workspace-smoke.ts",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",

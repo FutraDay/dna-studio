@@ -136,7 +136,16 @@ describe("POST /api/campaigns/[id]/schedule", () => {
 
     expect(campaign.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "camp_1", userId: "user_1" },
+        where: {
+          id: "camp_1",
+          brand: {
+            workspace: {
+              members: {
+                some: { userId: "user_1" },
+              },
+            },
+          },
+        },
         include: { assets: { where: { id: { in: ["asset_1", "not_mine"] } } } },
       })
     );
