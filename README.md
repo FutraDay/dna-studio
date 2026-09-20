@@ -186,9 +186,14 @@ COMFYUI_BASE_URL=http://host.docker.internal:8188
 COMFYUI_CHECKPOINT=DreamShaper_8_pruned.safetensors
 ```
 
-With `LOCAL_IMAGE_ONLY=true`, saved or environment-configured hosted image providers cannot be selected at runtime. Campaign review then labels image actions **Free Local**. Generate one image first to inspect the campaign prompt, then generate the remaining previews if the direction looks useful.
+With `LOCAL_IMAGE_ONLY=true`, saved or environment-configured hosted image providers cannot be selected at runtime. Campaign review uses a two-stage free-local creative workflow:
 
-Local ComfyUI images are private preview/testing assets served through DNA Studio. They are not public CDN URLs, so use a hosted image provider or upload the approved creative to public storage before social publishing.
+1. Choose a **Creative style**: Professional Photography, Tradie / Service Business, Product / UI, or Before to After Automation.
+2. **Generate Background - Free Local**. DNA Studio rewrites the campaign art direction into a text-free photographic background prompt and blocks fake dashboards, charts, logos, robots, readable UI, and similar diffusion-model failure modes.
+3. **Compose Pro Ad**. DNA Studio deterministically adds Brand DNA colours, brand-name treatment, headline, subhead, CTA, glow/frame treatment, and platform-safe layout.
+4. Use **Regenerate Background** or **Recompose Pro Ad** independently when only one layer needs changing.
+
+This keeps local diffusion responsible for photography while DNA Studio controls typography and brand layout. Local ComfyUI images are private preview/testing assets served through DNA Studio. They are not public CDN URLs, so use a hosted image provider or upload the approved creative to public storage before social publishing.
 
 ## Troubleshooting
 
@@ -316,11 +321,19 @@ dna-studio/
 - [x] UGC video generation with creator avatars (Veo, HeyGen, D-ID)
 - [x] Health endpoint (`/api/health`) and container healthcheck
 - [x] CI on every pull request — migrations, entrypoint, web build, Expo Android bundle, and a full `docker compose` boot
-- [x] Test suite — 879 tests across the library, API routes, analytics, calendar, team collaboration, PDF export, webhooks, Chrome extension/mobile auth flows, and key React UI flows, with a coverage gate in CI
+- [x] Test suite — 891 tests across the library, API routes, analytics, calendar, team collaboration, PDF export, webhooks, Chrome extension/mobile auth flows, and key React UI flows, with a coverage gate in CI
 
 ### Shipped in v0.3.0
 
 - [x] Free local image testing with ComfyUI - GPU-backed campaign previews, `LOCAL_IMAGE_ONLY` safety lock, authenticated local-image proxying, Docker host-bridge support, one-command Windows launcher, and explicit **Free Local** campaign controls
+
+### Professional Creative Composer (v0.4)
+
+- [x] Two-stage local creative workflow: text-free ComfyUI background plates + deterministic branded ad composition
+- [x] Brand-aware 1080x1080 Sharp compositor using Brand DNA colours, name, campaign headline/subhead, CTA, and platform-safe layout
+- [x] Four creative presets: Professional Photography, Tradie / Service Business, Product / UI, and Before to After Automation
+- [x] Regenerate Background and Recompose Pro Ad independently without paid image credits
+- [x] Local campaign prompt repair blocks charts, dashboards, fake UI/text, logos, sci-fi HUDs, robots, and cyborgs from background generation
 
 ### Up Next
 

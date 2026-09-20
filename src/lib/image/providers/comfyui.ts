@@ -110,7 +110,7 @@ export class ComfyUIProvider implements ImageProvider {
       "3": {
         class_type: "CLIPTextEncode",
         inputs: {
-          text: "text, watermark, logo, signature, blurry, distorted, malformed, low quality, low resolution",
+          text: "readable text, letters, numbers, words, watermark, logo, signature, chart, graph, infographic, dashboard, flowchart, diagram, fake UI, interface text, sci-fi HUD, robot, cyborg, blurry, distorted, malformed, low quality, low resolution, duplicate people, extra fingers, bad hands",
           clip: ["1", 1],
         },
       },
