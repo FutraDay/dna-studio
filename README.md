@@ -327,7 +327,7 @@ dna-studio/
 
 - [x] Free local image testing with ComfyUI - GPU-backed campaign previews, `LOCAL_IMAGE_ONLY` safety lock, authenticated local-image proxying, Docker host-bridge support, one-command Windows launcher, and explicit **Free Local** campaign controls
 
-### Professional Creative Composer (v0.4)
+### Shipped in v0.4.0
 
 - [x] Two-stage local creative workflow: text-free ComfyUI background plates + deterministic branded ad composition
 - [x] Brand-aware 1080x1080 Sharp compositor using Brand DNA colours, name, campaign headline/subhead, CTA, and platform-safe layout
