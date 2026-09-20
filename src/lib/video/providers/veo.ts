@@ -63,7 +63,7 @@ export class VeoProvider implements VideoProvider {
           ? "16:9" // Veo doesn't support 1:1, use 16:9 and crop
           : "9:16";
 
-    const prompt = this.buildPrompt(characterDesc, options.script, options.productImageUrl);
+    const prompt = this.buildPrompt(characterDesc, options.script);
 
     const body = {
       instances: [{ prompt }],
@@ -144,11 +144,7 @@ export class VeoProvider implements VideoProvider {
     };
   }
 
-  private buildPrompt(
-    characterDesc: string,
-    script: string,
-    _productImageUrl?: string
-  ): string {
+  private buildPrompt(characterDesc: string, script: string): string {
     if (characterDesc) {
       return `UGC-style selfie video of ${characterDesc} talking directly to camera in a casual, authentic way. They are enthusiastically speaking the following script: "${script}". Natural lighting, slight camera movement, genuine expressions, casual setting. Looks like a real social media creator, not a polished ad. The person is animated and engaging.`;
     }

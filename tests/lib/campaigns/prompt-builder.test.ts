@@ -93,6 +93,62 @@ describe("buildCampaignPrompt", () => {
     expect(prompt).toContain('"imagePrompt"');
     expect(prompt).toContain("Generate exactly 5 campaign concepts");
   });
+
+  it("forces five distinct strategic roles instead of duplicate angles", () => {
+    const prompt = buildCampaignPrompt(dna, "goal", ["instagram"]);
+    expect(prompt).toContain("Problem awareness");
+    expect(prompt).toContain("Education");
+    expect(prompt).toContain("Proof and trust");
+    expect(prompt).toContain("Solution and product");
+    expect(prompt).toContain("Conversion");
+    expect(prompt).toContain("Do not reuse the same opening hook");
+  });
+
+  it("includes the verified source excerpt for evidence grounding", () => {
+    const prompt = buildCampaignPrompt(dna, "goal", ["instagram"]);
+    expect(prompt).toContain("VERIFIED SOURCE EXCERPT");
+    expect(prompt).toContain("Acme Coffee roasts single origin beans in small batches.");
+  });
+
+  it("requires explicit strategic roles and evidence integrity", () => {
+    const prompt = buildCampaignPrompt(dna, "goal", ["instagram"]);
+    expect(prompt).toContain('"strategy": "<problem_awareness|education|proof_trust|solution_product|conversion>"');
+    expect(prompt).toContain("EVIDENCE INTEGRITY RULES");
+    expect(prompt).toContain("Do not invent a free consultation");
+    expect(prompt).toContain("Hypothetical examples must be explicitly framed as hypothetical");
+  });
+  it("requires genuine platform adaptation", () => {
+    const prompt = buildCampaignPrompt(dna, "goal", ["instagram", "linkedin"]);
+    expect(prompt).toContain("genuinely platform-specific content");
+    expect(prompt).toContain("Do not write like an Instagram caption");
+    expect(prompt).toContain("Twitter: under 280 characters");
+  });
+
+  it("directs each platform as a distinct editorial product", () => {
+    const prompt = buildCampaignPrompt(dna, "goal", ["instagram", "linkedin", "facebook", "twitter"]);
+    expect(prompt).toContain("PLATFORM CONTENT DIRECTOR RULES");
+    expect(prompt).toContain("Do not paraphrase the same caption four times");
+    expect(prompt).toContain("no more than 2 question-style opening hooks");
+    expect(prompt).toContain("materially different in wording and structure");
+    expect(prompt).toContain("no more than 3 hashtags");
+    expect(prompt).toContain("no more than 2 hashtags");
+  });
+
+  it("assigns distinct content jobs and bans templated openings", () => {
+    const prompt = buildCampaignPrompt(dna, "goal", ["instagram", "linkedin", "facebook", "twitter"]);
+    expect(prompt).toContain("concrete day-in-the-life pain scenario");
+    expect(prompt).toContain("inline 3-step checklist");
+    expect(prompt).toContain("product demonstration grounded in verified facts");
+    expect(prompt).toContain("comparison/decision framing");
+    expect(prompt).toContain("Avoid templated openings entirely");
+  });
+
+  it("forces visual variety and prevents fake product screenshots", () => {
+    const prompt = buildCampaignPrompt(dna, "goal", ["instagram"]);
+    expect(prompt).toContain("materially different visual treatments");
+    expect(prompt).toContain("Do not make every visual a laptop, dashboard, device mockup");
+    expect(prompt).toContain("Do NOT invent fake product screenshots");
+  });
 });
 
 describe("buildImagePrompt", () => {

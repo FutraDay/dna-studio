@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useCallback, Suspense } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  Suspense,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { AppShell } from "@/components/layout/app-shell";
@@ -12,6 +18,12 @@ import type { BrandDNA, CrawlProgress } from "@/lib/brand-dna/types";
 import { Globe, ArrowRight, Dna } from "lucide-react";
 
 type Phase = "input" | "analyzing" | "preview";
+
+interface WorkspaceOption {
+  id: string;
+  name: string;
+  role: string;
+}
 
 export default function NewBrandPage() {
   return (
@@ -25,6 +37,8 @@ function NewBrandContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialUrl = searchParams.get("url") || "";
+  const autoAnalyze = searchParams.get("autoAnalyze") === "1";
+  const autoAnalyzeStarted = useRef(false);
 
   const [url, setUrl] = useState(initialUrl);
   const [normalisedUrl, setNormalisedUrl] = useState("");
@@ -33,6 +47,40 @@ function NewBrandContent() {
   const [dna, setDna] = useState<BrandDNA | null>(null);
   const [brandId, setBrandId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [workspaces, setWorkspaces] = useState<WorkspaceOption[]>([]);
+  const [workspaceId, setWorkspaceId] = useState("");
+  const [workspacesLoaded, setWorkspacesLoaded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    fetch("/api/workspaces")
+      .then(async (response) => {
+        if (!response.ok) return [];
+        return response.json();
+      })
+      .then((items: WorkspaceOption[]) => {
+        if (!active) return;
+        const editable = items.filter(
+          (workspace) =>
+            workspace.role === "owner" || workspace.role === "admin"
+        );
+        setWorkspaces(editable);
+        if (editable.length > 0) {
+          setWorkspaceId((current) => current || editable[0].id);
+        }
+      })
+      .catch(() => {
+        // Brand analysis can still fall back to the personal workspace.
+      })
+      .finally(() => {
+        if (active) setWorkspacesLoaded(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleAnalyze = useCallback(async () => {
     if (!url) return;
@@ -49,7 +97,10 @@ function NewBrandContent() {
       const response = await fetch("/api/brands/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: normalised }),
+        body: JSON.stringify({
+          url: normalised,
+          ...(workspaceId ? { workspaceId } : {}),
+        }),
       });
 
       const reader = response.body?.getReader();
@@ -94,7 +145,21 @@ function NewBrandContent() {
       setError(err instanceof Error ? err.message : "Analysis failed");
       setPhase("input");
     }
-  }, [url]);
+  }, [url, workspaceId]);
+
+  useEffect(() => {
+    if (
+      !autoAnalyze ||
+      !initialUrl ||
+      !workspacesLoaded ||
+      autoAnalyzeStarted.current
+    ) {
+      return;
+    }
+
+    autoAnalyzeStarted.current = true;
+    void handleAnalyze();
+  }, [autoAnalyze, handleAnalyze, initialUrl, workspacesLoaded]);
 
   return (
     <AppShell>
@@ -119,6 +184,33 @@ function NewBrandContent() {
               </div>
 
               <Card className="p-6">
+                {workspaces.length > 1 && (
+                  <div className="mb-4">
+                    <label
+                      htmlFor="brand-workspace"
+                      className="block text-xs text-muted mb-2"
+                    >
+                      Workspace
+                    </label>
+                    <select
+                      id="brand-workspace"
+                      value={workspaceId}
+                      onChange={(event) => setWorkspaceId(event.target.value)}
+                      className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-foreground outline-none focus:border-accent/50"
+                    >
+                      {workspaces.map((workspace) => (
+                        <option key={workspace.id} value={workspace.id}>
+                          {workspace.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-2 text-[11px] text-muted">
+                      Team members in this workspace will be able to work with
+                      the brand and its campaigns.
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex gap-3">
                   <div className="flex-1 flex items-center gap-3 px-4 py-3 rounded-lg border border-border bg-surface">
                     <Globe className="w-4 h-4 text-muted flex-shrink-0" />

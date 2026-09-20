@@ -43,7 +43,8 @@ describe("POST /api/images/generate", () => {
   beforeEach(() => {
     generate.mockResolvedValue({ url: "https://cdn/out.png" });
     imageProvider.mockResolvedValue({ generate } as never);
-    asset.updateMany.mockResolvedValue({ count: 1 } as never);
+    asset.findFirst.mockResolvedValue({ id: "asset_1" } as never);
+    asset.update.mockResolvedValue({ id: "asset_1" } as never);
   });
 
   it("returns the generated image URL", async () => {
@@ -61,20 +62,36 @@ describe("POST /api/images/generate", () => {
 
   it("does not touch the database when no assetId is given", async () => {
     await generateImage(post("/api/images/generate", { prompt: "a mug" }));
-    expect(asset.updateMany).not.toHaveBeenCalled();
+    expect(asset.findFirst).not.toHaveBeenCalled();
+    expect(asset.update).not.toHaveBeenCalled();
   });
 
   it("only updates an asset that belongs to the caller", async () => {
     await generateImage(post("/api/images/generate", { prompt: "a mug", assetId: "asset_1" }));
 
-    expect(asset.updateMany).toHaveBeenCalledWith({
-      where: { id: "asset_1", campaign: { userId: "user_1" } },
+    expect(asset.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "asset_1",
+        campaign: {
+          brand: {
+            workspace: {
+              members: {
+                some: { userId: "user_1" },
+              },
+            },
+          },
+        },
+      },
+      select: { id: true },
+    });
+    expect(asset.update).toHaveBeenCalledWith({
+      where: { id: "asset_1" },
       data: { imageUrl: "https://cdn/out.png" },
     });
   });
 
   it("answers 404 rather than writing to someone else's asset", async () => {
-    asset.updateMany.mockResolvedValue({ count: 0 } as never);
+    asset.findFirst.mockResolvedValue(null as never);
 
     const response = await generateImage(
       post("/api/images/generate", { prompt: "a mug", assetId: "someone_elses_asset" })
@@ -82,6 +99,8 @@ describe("POST /api/images/generate", () => {
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "Asset not found" });
+    expect(generate).not.toHaveBeenCalled();
+    expect(asset.update).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -225,7 +244,18 @@ describe("GET /api/campaigns/[id]", () => {
 
     expect(response.status).toBe(200);
     expect(campaign.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: "camp_1", userId: "user_1" } })
+      expect.objectContaining({
+        where: {
+          id: "camp_1",
+          brand: {
+            workspace: {
+              members: {
+                some: { userId: "user_1" },
+              },
+            },
+          },
+        },
+      })
     );
   });
 

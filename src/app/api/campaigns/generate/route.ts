@@ -1,14 +1,19 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { requireSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
-import { streamCampaign } from "@/lib/campaigns/generator";
+import { repairCampaign, streamCampaign, type GeneratedCampaign } from "@/lib/campaigns/generator";
+import { formatCampaignQualityError, validateCampaignQuality } from "@/lib/campaigns/quality";
+import { normalizeCampaignStyle, repairCampaignDeterministically } from "@/lib/campaigns/style-normalizer";
 import type { BrandDNA } from "@/lib/brand-dna/types";
+import { brandAccessWhere } from "@/lib/workspaces/access";
+import { safeQueueWebhookEvents } from "@/lib/webhooks/queue";
 
 const generateSchema = z.object({
   brandId: z.string(),
   goal: z.string().min(1),
-  platforms: z.array(z.enum(["instagram", "linkedin", "facebook", "twitter"])),
+  platforms: z.array(z.enum(["instagram", "linkedin", "facebook", "twitter"])).min(1),
   language: z.string().default("English"),
 });
 
@@ -19,7 +24,7 @@ export async function POST(request: Request) {
     const { brandId, goal, platforms, language } = generateSchema.parse(body);
 
     const brand = await prisma.brand.findFirst({
-      where: { id: brandId, userId: session.user.id },
+      where: brandAccessWhere(session.user.id, brandId),
     });
 
     if (!brand) {
@@ -51,14 +56,87 @@ export async function POST(request: Request) {
           // Parse the completed content and save
           const match = fullContent.match(/\{[\s\S]*\}/);
           if (!match) throw new Error("LLM did not return valid JSON for campaign");
-          const generated = JSON.parse(match[0]);
+          let generated = normalizeCampaignStyle(JSON.parse(match[0]) as GeneratedCampaign);
+          let quality = validateCampaignQuality(generated, dna, goal, platforms);
+          if (!quality.passed) {
+            generated = repairCampaignDeterministically(generated, quality.issues);
+            quality = validateCampaignQuality(generated, dna, goal, platforms);
+          }
+          let repairAttempts = 0;
+
+          const blockingCodes = new Set([
+            "concept_count",
+            "platform_coverage",
+            "strategy_coverage",
+            "invalid_asset",
+            "twitter_length",
+            "unsupported_metric",
+            "unsupported_entity",
+            "unsupported_evidence_claim",
+            "unsupported_offer",
+            "unsupported_resource",
+            "duplicate_caption",
+            "repeated_hook",
+            "question_hook_overuse",
+            "repeated_cta",
+            "repeated_hashtag_set",
+            "cross_platform_similarity",
+            "platform_style",
+            "generic_cliche",
+            "generic_copy",
+            "platform_depth",
+            "emoji_overuse",
+            "concept_similarity",
+            "repetitive_visuals",
+          ]);
+
+          while (!quality.passed && repairAttempts < 3) {
+            generated = normalizeCampaignStyle(
+              await repairCampaign(
+                dna,
+                goal,
+                platforms,
+                language,
+                generated,
+                quality.issues
+              )
+            );
+            repairAttempts += 1;
+            quality = validateCampaignQuality(generated, dna, goal, platforms);
+            if (!quality.passed) {
+              generated = repairCampaignDeterministically(generated, quality.issues);
+              quality = validateCampaignQuality(generated, dna, goal, platforms);
+            }
+
+            // Continue repairing while any configured blocking quality issue remains.
+            const remainingBlocking = quality.issues.filter((issue) =>
+              blockingCodes.has(issue.code)
+            );
+            if (!quality.passed && remainingBlocking.length === 0) break;
+          }
+
+          if (!quality.passed) {
+            const blockingIssues = quality.issues.filter((issue) =>
+              blockingCodes.has(issue.code)
+            );
+            if (blockingIssues.length > 0) {
+              throw new Error(
+                formatCampaignQualityError({ passed: false, issues: blockingIssues })
+              );
+            }
+
+            console.warn(
+              "Campaign saved with non-blocking quality warnings:",
+              quality.issues.map((issue) => issue.message)
+            );
+          }
 
           const campaign = await prisma.campaign.create({
             data: {
               brandId,
               userId: session.user.id,
               goal,
-              concepts: generated.concepts,
+              concepts: generated.concepts as unknown as Prisma.InputJsonValue,
               assets: {
                 create: generated.concepts.flatMap(
                   (concept: { assets: Array<{ platform: string; caption: string; hashtags: string[]; imagePrompt?: string }> }) =>
@@ -76,6 +154,27 @@ export async function POST(request: Request) {
             },
             include: { assets: true },
           });
+
+          await safeQueueWebhookEvents(prisma, [
+            {
+              workspaceId: brand.workspaceId,
+              event: "campaign.created",
+              data: {
+                brand: {
+                  id: brand.id,
+                  name: brand.name,
+                },
+                campaign: {
+                  id: campaign.id,
+                  goal,
+                  assetCount: campaign.assets.length,
+                  platforms: Array.from(
+                    new Set(campaign.assets.map((asset) => asset.platform))
+                  ),
+                },
+              },
+            },
+          ]);
 
           controller.enqueue(
             encoder.encode(

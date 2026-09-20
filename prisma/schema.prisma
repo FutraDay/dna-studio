@@ -22,6 +22,9 @@ model User {
   photoshoots   Photoshoot[]
   ugcVideos     UGCVideo[]
   connections   SocialConnection[]
+  mobileTokens    MobileToken[]
+  ownedWorkspaces Workspace[]       @relation("WorkspaceOwner")
+  workspaceMemberships WorkspaceMember[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -60,10 +63,52 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-model Brand {
-  id        String     @id @default(cuid())
-  userId    String
+model MobileToken {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique
+  deviceName String?
+  expiresAt  DateTime
+  lastUsedAt DateTime?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Workspace {
+  id        String            @id @default(cuid())
   name      String
+  ownerId   String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  owner     User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members   WorkspaceMember[]
+  brands    Brand[]
+  webhooks  WebhookEndpoint[]
+
+  @@index([ownerId])
+}
+
+model WorkspaceMember {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        String    @default("member")
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+model Brand {
+  id          String     @id @default(cuid())
+  userId      String
+  workspaceId String
+  name        String
   url       String
   dna       Json
   logoUrl   String?
@@ -77,35 +122,65 @@ model Brand {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
 }
 
 model Campaign {
-  id        String   @id @default(cuid())
-  brandId   String
-  userId    String
-  goal      String
-  concepts  Json
-  assets    Asset[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String   @id @default(cuid())
+  brandId            String
+  userId             String
+  goal               String
+  concepts           Json
+  experimentId       String?
+  variantLabel       String?
+  isPreferredVariant Boolean  @default(false)
+  assets             Asset[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  brand              Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, experimentId])
+  @@unique([experimentId, variantLabel])
 }
 
 model Asset {
-  id          String    @id @default(cuid())
-  campaignId  String
-  platform    String
-  caption     String    @db.Text
-  imageUrl    String?
-  imagePrompt String?   @db.Text
-  hashtags    String[]
-  scheduledAt DateTime?
-  publishedAt DateTime?
-  status      String    @default("draft")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  campaign    Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  id             String               @id @default(cuid())
+  campaignId     String
+  platform       String
+  caption        String               @db.Text
+  imageUrl       String?
+  imagePrompt    String?              @db.Text
+  hashtags       String[]
+  providerPostId String?
+  scheduledAt    DateTime?
+  publishedAt    DateTime?
+  status         String               @default("draft")
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  campaign       Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  metrics        PostMetricSnapshot[]
+
+  @@index([providerPostId])
+}
+
+model PostMetricSnapshot {
+  id          String   @id @default(cuid())
+  assetId     String
+  impressions Int      @default(0)
+  reach       Int      @default(0)
+  likes       Int      @default(0)
+  comments    Int      @default(0)
+  shares      Int      @default(0)
+  clicks      Int      @default(0)
+  saves       Int      @default(0)
+  source      String   @default("provider")
+  fetchedAt   DateTime @default(now())
+  asset       Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId, fetchedAt])
 }
 
 model Photoshoot {
@@ -157,6 +232,41 @@ model UGCVideo {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WebhookEndpoint {
+  id          String            @id @default(cuid())
+  workspaceId String
+  name        String
+  provider    String
+  url         String            @db.Text
+  secret      String            @db.Text
+  events      String[]
+  enabled     Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  deliveries  WebhookDelivery[]
+
+  @@index([workspaceId])
+}
+
+model WebhookDelivery {
+  id             String          @id @default(cuid())
+  webhookId      String
+  event          String
+  payload        Json
+  status         String          @default("pending")
+  attempts       Int             @default(0)
+  responseStatus Int?
+  error          String?         @db.Text
+  deliveredAt    DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  webhook        WebhookEndpoint @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, createdAt])
+  @@index([status, createdAt])
 }
 
 model SocialConnection {

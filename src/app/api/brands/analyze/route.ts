@@ -3,16 +3,40 @@ import { z } from "zod";
 import { requireSession } from "@/lib/auth/session";
 import { crawlBrandDNA } from "@/lib/brand-dna/crawler";
 import { prisma } from "@/lib/db";
+import {
+  ensurePersonalWorkspace,
+  requireWorkspaceRole,
+} from "@/lib/workspaces/access";
+import { safeQueueWebhookEvents } from "@/lib/webhooks/queue";
 
 const analyzeSchema = z.object({
   url: z.string().url(),
+  workspaceId: z.string().min(1).optional(),
 });
 
 export async function POST(request: Request) {
   try {
     const session = await requireSession();
     const body = await request.json();
-    const { url } = analyzeSchema.parse(body);
+    const { url, workspaceId } = analyzeSchema.parse(body);
+
+    const workspace = workspaceId
+      ? await requireWorkspaceRole(
+          session.user.id,
+          workspaceId,
+          ["owner", "admin"]
+        )
+      : await ensurePersonalWorkspace(session.user.id);
+
+    if (!workspace) {
+      return NextResponse.json(
+        { error: "Owner or admin permission required for that workspace" },
+        { status: 403 }
+      );
+    }
+
+    const targetWorkspaceId =
+      "workspace" in workspace ? workspace.workspace.id : workspace.id;
 
     // Stream progress via SSE-style response
     const encoder = new TextEncoder();
@@ -31,6 +55,7 @@ export async function POST(request: Request) {
           const brand = await prisma.brand.create({
             data: {
               userId: session.user.id,
+              workspaceId: targetWorkspaceId,
               name: dna.name,
               url: dna.url,
               dna: JSON.parse(JSON.stringify(dna)),
@@ -42,6 +67,23 @@ export async function POST(request: Request) {
               audience: dna.audience.primary,
             },
           });
+
+          await safeQueueWebhookEvents(prisma, [
+            {
+              workspaceId: targetWorkspaceId,
+              event: "brand.created",
+              data: {
+                brand: {
+                  id: brand.id,
+                  name: dna.name,
+                  url: dna.url,
+                  industry: dna.industry,
+                  category: dna.category,
+                  tone: dna.tone.primary,
+                },
+              },
+            },
+          ]);
 
           controller.enqueue(
             encoder.encode(

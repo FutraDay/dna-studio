@@ -45,6 +45,19 @@ describe("resolveSettings", () => {
       expect(settings.llmModel).toBe("claude-sonnet-4-20250514");
     });
 
+    it("reports Ollama as effective when LOCAL_LLM_ONLY overrides saved hosted settings", async () => {
+      vi.stubEnv("LOCAL_LLM_ONLY", "true");
+      vi.stubEnv("OLLAMA_BASE_URL", "http://host.docker.internal:11434");
+      vi.stubEnv("OLLAMA_MODEL", "llama3.1:8b");
+      signedIn({ llmProvider: "openai", llmApiKey: "sk-paid", llmModel: "gpt-paid" });
+
+      const settings = await resolveSettings();
+      expect(settings.llmProvider).toBe("ollama");
+      expect(settings.llmApiKey).toBe("");
+      expect(settings.llmModel).toBe("llama3.1:8b");
+      expect(settings.ollamaUrl).toBe("http://host.docker.internal:11434");
+    });
+
     it("picks the API key matching the selected LLM provider", async () => {
       vi.stubEnv("OPENAI_API_KEY", "sk-openai");
       vi.stubEnv("GOOGLE_API_KEY", "goog");

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DNA Studio Extension Settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="settings-shell">
+      <section class="brand-lockup" aria-label="DNA Studio">
+        <img src="icons/icon128.png" alt="" width="48" height="48" />
+        <div>
+          <p class="eyebrow">DNA STUDIO</p>
+          <h1>Brand Analyzer</h1>
+        </div>
+      </section>
+
+      <section class="panel">
+        <p class="intro">
+          Clicking the extension analyzes the current website using your
+          existing DNA Studio session. No API keys or AI credentials are stored
+          in Chrome.
+        </p>
+        <form id="settings-form">
+          <label for="app-url">DNA Studio URL</label>
+          <input
+            id="app-url"
+            name="app-url"
+            type="url"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="http://localhost:3000"
+          />
+          <p class="hint">
+            Use your local URL now, or replace it with your hosted DNA Studio
+            address later.
+          </p>
+
+          <div class="actions">
+            <button type="submit">Save</button>
+            <a id="open-app" href="http://localhost:3000" target="_blank">
+              Open DNA Studio
+            </a>
+          </div>
+          <p id="status" class="status" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+      <section class="note">
+        <strong>One-click flow</strong>
+        <span>
+          Open a public website, click the DNA Studio extension icon, and the
+          Brand DNA analysis starts automatically in a new tab.
+        </span>
+      </section>
+    </main>
+
+    <script src="shared.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

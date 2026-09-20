@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { ColorSwatch } from "@/components/ui/color-swatch";
 import { Card } from "@/components/ui/card";
@@ -22,9 +23,12 @@ export function DNAPreview({ dna }: DNAPreviewProps) {
       <Card className="p-8">
         <div className="flex items-start gap-5">
           {dna.logoUrl ? (
-            <img
+            <Image
               src={dna.logoUrl}
               alt={dna.name}
+              width={64}
+              height={64}
+              unoptimized
               className="w-16 h-16 rounded-xl object-cover bg-white flex-shrink-0"
             />
           ) : (

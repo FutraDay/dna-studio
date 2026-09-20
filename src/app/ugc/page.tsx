@@ -175,7 +175,6 @@ export default function UGCPage() {
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
 
   // Result state
-  const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
   const [videoStatus, setVideoStatus] = useState<string>("idle");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
@@ -221,7 +220,6 @@ export default function UGCPage() {
     setProductDescription("");
     setSelectedAvatar(null);
     setScript("");
-    setCurrentVideoId(null);
     setVideoStatus("idle");
     setVideoUrl(null);
     setVideoError(null);
@@ -305,7 +303,6 @@ export default function UGCPage() {
       if (saveRes.ok) {
         const saved = await saveRes.json();
         dbId = saved.id;
-        setCurrentVideoId(dbId);
       }
 
       // Start video generation
@@ -401,7 +398,6 @@ export default function UGCPage() {
   }, [script, selectedAvatar, productImage, productDescription, aspectRatio]);
 
   const handleViewVideo = (video: SavedVideo) => {
-    setCurrentVideoId(video.id);
     setProductDescription(video.productDescription || "");
     setScript(video.script);
     setSelectedAvatar({

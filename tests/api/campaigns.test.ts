@@ -50,7 +50,18 @@ describe("GET /api/campaigns", () => {
 
     expect((await listCampaigns()).status).toBe(200);
     expect(campaign.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { userId: "user_1" }, orderBy: { createdAt: "desc" } })
+      expect.objectContaining({
+        where: {
+          brand: {
+            workspace: {
+              members: {
+                some: { userId: "user_1" },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      })
     );
   });
 
@@ -90,7 +101,14 @@ describe("GET /api/campaigns/suggestions", () => {
   it("scopes the brand lookup to the signed-in user", async () => {
     await getSuggestions(get("?brandId=brand_1"));
     expect(brand.findFirst).toHaveBeenCalledWith({
-      where: { id: "brand_1", userId: "user_1" },
+      where: {
+        id: "brand_1",
+        workspace: {
+          members: {
+            some: { userId: "user_1" },
+          },
+        },
+      },
     });
   });
 

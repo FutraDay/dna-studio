@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
     ],
   },
   serverExternalPackages: ["playwright", "sharp"],
+  turbopack: {
+    root: process.cwd(),
+  },
 };
 
 export default nextConfig;

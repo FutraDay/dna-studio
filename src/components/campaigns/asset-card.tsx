@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ interface AssetCardProps {
   };
   onPublish?: (id: string) => void;
   onSchedule?: (id: string, date: string) => void;
-  onUpdateCaption?: (id: string, caption: string) => void;
+  onUpdateCaption?: (id: string, caption: string) => Promise<boolean>;
   onGenerateImage?: (id: string, prompt: string) => Promise<string | null>;
 }
 
@@ -65,12 +65,33 @@ export function AssetCard({
   const [showMenu, setShowMenu] = useState(false);
   const [imageUrl, setImageUrl] = useState(asset.imageUrl);
   const [generatingImage, setGeneratingImage] = useState(false);
+  const [savingCaption, setSavingCaption] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const Icon = platformIcons[asset.platform] || Send;
+  const captionInvalid =
+    !caption.trim() || (asset.platform === "twitter" && caption.length > 280);
 
-  const handleSaveCaption = () => {
-    onUpdateCaption?.(asset.id, caption);
-    setEditing(false);
+  useEffect(() => {
+    if (!editing) setCaption(asset.caption);
+  }, [asset.caption, editing]);
+
+  const handleSaveCaption = async () => {
+    if (!onUpdateCaption || captionInvalid || savingCaption) return;
+    setSavingCaption(true);
+    setEditError(null);
+    try {
+      const saved = await onUpdateCaption(asset.id, caption.trim());
+      if (saved) {
+        setEditing(false);
+      } else {
+        setEditError("Couldn’t save this edit. Please try again.");
+      }
+    } catch {
+      setEditError("Couldn’t save this edit. Please try again.");
+    } finally {
+      setSavingCaption(false);
+    }
   };
 
   const handleGenerateImage = async () => {
@@ -92,7 +113,11 @@ export function AssetCard({
     >
       <Card className="overflow-hidden p-0">
         {/* Visual creative area */}
-        <div className="relative aspect-[4/5] bg-gradient-to-br from-card-hover to-card flex items-center justify-center p-8 overflow-hidden">
+        <div
+          className={`relative bg-gradient-to-br from-card-hover to-card flex items-center justify-center p-6 overflow-hidden ${
+            imageUrl ? "aspect-[4/3]" : "min-h-[170px]"
+          }`}
+        >
           {/* Generated image */}
           {imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -117,6 +142,8 @@ export function AssetCard({
             {asset.status === "draft" && (
               <div className="relative">
                 <button
+                  type="button"
+                  aria-label="Post actions"
                   onClick={() => setShowMenu(!showMenu)}
                   className="p-1 rounded hover:bg-background/40 transition-colors cursor-pointer"
                 >
@@ -148,10 +175,14 @@ export function AssetCard({
           {generatingImage ? (
             <Loader2 className="w-8 h-8 text-accent animate-spin" />
           ) : !imageUrl ? (
-            <p className="text-center text-lg font-semibold leading-snug text-foreground/90 max-w-[90%]">
-              {caption.split("\n")[0]?.slice(0, 80)}
-              {caption.length > 80 ? "..." : ""}
-            </p>
+            <div className="max-w-[86%] text-center">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-muted/70">
+                Copy draft
+              </p>
+              <p className="mt-3 text-sm font-medium leading-relaxed text-foreground/80 line-clamp-4">
+                {caption.split(/(?<=[.!?])\s+/)[0]?.slice(0, 140)}
+              </p>
+            </div>
           ) : null}
         </div>
 
@@ -161,12 +192,32 @@ export function AssetCard({
             <div className="space-y-2">
               <textarea
                 value={caption}
-                onChange={(e) => setCaption(e.target.value)}
-                className="w-full bg-surface border border-border rounded-lg p-3 text-sm text-foreground resize-none focus:outline-none focus:border-accent/30"
-                rows={4}
+                onChange={(e) => {
+                  setCaption(e.target.value);
+                  setEditError(null);
+                }}
+                className="w-full bg-surface border border-border rounded-lg p-3 text-sm text-foreground resize-y focus:outline-none focus:border-accent/30"
+                rows={7}
               />
-              <div className="flex gap-2">
-                <Button size="sm" onClick={handleSaveCaption}>
+              <div className="flex items-center justify-between gap-3">
+                <p
+                  className={`text-[11px] ${
+                    asset.platform === "twitter" && caption.length > 280
+                      ? "text-danger"
+                      : "text-muted"
+                  }`}
+                >
+                  {asset.platform === "twitter"
+                    ? `${caption.length}/280 characters`
+                    : `${caption.trim().split(/\s+/).filter(Boolean).length} words`}
+                </p>
+                <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleSaveCaption}
+                  loading={savingCaption}
+                  disabled={captionInvalid || savingCaption}
+                >
                   <Check className="w-3 h-3" />
                   Save
                 </Button>
@@ -175,23 +226,32 @@ export function AssetCard({
                   variant="ghost"
                   onClick={() => {
                     setCaption(asset.caption);
+                    setEditError(null);
                     setEditing(false);
                   }}
                 >
                   <X className="w-3 h-3" />
                 </Button>
+                </div>
               </div>
+              {editError && (
+                <p className="text-xs text-danger">{editError}</p>
+              )}
             </div>
           ) : (
-            <div className="group relative">
-              <p className="text-sm text-foreground/70 line-clamp-3">
+            <div>
+              <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/75 line-clamp-6">
                 {asset.caption}
               </p>
               <button
-                onClick={() => setEditing(true)}
-                className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-card-hover cursor-pointer"
+                onClick={() => {
+                  setEditError(null);
+                  setEditing(true);
+                }}
+                className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted hover:text-accent transition-colors cursor-pointer"
               >
-                <Edit3 className="w-3 h-3 text-muted" />
+                <Edit3 className="w-3 h-3" />
+                Edit copy
               </button>
             </div>
           )}
@@ -217,7 +277,7 @@ export function AssetCard({
               disabled={generatingImage}
             >
               <Sparkles className="w-3 h-3" />
-              {generatingImage ? "Generating..." : "Generate Image"}
+              {generatingImage ? "Generating..." : "Generate Image · Uses Credits"}
             </Button>
           )}
 

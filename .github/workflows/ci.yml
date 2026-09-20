@@ -94,6 +94,27 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm run build
 
+  mobile:
+    name: React Native mobile app
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - run: npm ci
+      - name: Audit mobile dependencies
+        run: npm audit --audit-level=moderate
+      - name: Verify Expo dependency compatibility
+        run: npx expo install --check
+      - name: Build Android bundle
+        run: npm run export:android
+
   compose:
     name: docker compose up (end to end)
     runs-on: ubuntu-latest

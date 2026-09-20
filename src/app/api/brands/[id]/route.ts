@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
+import {
+  brandAccessWhere,
+  requireWorkspaceRole,
+} from "@/lib/workspaces/access";
 
 // Fields a user is allowed to edit. Deliberately excludes `id` and `userId`:
 // passing the request body straight to prisma.update let a caller reassign
@@ -28,8 +32,9 @@ export async function GET(
     const { id } = await params;
 
     const brand = await prisma.brand.findFirst({
-      where: { id, userId: session.user.id },
+      where: brandAccessWhere(session.user.id, id),
       include: {
+        workspace: { select: { id: true, name: true } },
         campaigns: {
           orderBy: { createdAt: "desc" },
           take: 10,
@@ -63,7 +68,7 @@ export async function PATCH(
     const data = updateBrandSchema.parse(await request.json());
 
     const brand = await prisma.brand.findFirst({
-      where: { id, userId: session.user.id },
+      where: brandAccessWhere(session.user.id, id),
     });
 
     if (!brand) {
@@ -102,11 +107,25 @@ export async function DELETE(
     const { id } = await params;
 
     const brand = await prisma.brand.findFirst({
-      where: { id, userId: session.user.id },
+      where: brandAccessWhere(session.user.id, id),
+      select: { id: true, workspaceId: true },
     });
 
     if (!brand) {
       return NextResponse.json({ error: "Brand not found" }, { status: 404 });
+    }
+
+    const permission = await requireWorkspaceRole(
+      session.user.id,
+      brand.workspaceId,
+      ["owner", "admin"]
+    );
+
+    if (!permission) {
+      return NextResponse.json(
+        { error: "Owner or admin permission required" },
+        { status: 403 }
+      );
     }
 
     await prisma.brand.delete({ where: { id } });

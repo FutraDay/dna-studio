@@ -8,7 +8,7 @@ import { DNAPreview } from "@/components/brand-dna/dna-preview";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { BrandDNA } from "@/lib/brand-dna/types";
-import { Dna, ArrowRight, RefreshCw, Camera } from "lucide-react";
+import { Dna, ArrowRight, RefreshCw, Camera, Download } from "lucide-react";
 
 interface BrandData {
   id: string;
@@ -117,6 +117,15 @@ export default function BrandPage() {
 
             {/* Quick actions */}
             <div className="space-y-2">
+              <a
+                href={`/api/brands/${brand.id}/style-guide`}
+                className="block"
+              >
+                <Button variant="secondary" className="w-full justify-start">
+                  <Download className="w-3.5 h-3.5" />
+                  Download Style Guide PDF
+                </Button>
+              </a>
               <Link href={`/campaigns/new?brandId=${brand.id}`} className="block">
                 <Button variant="secondary" className="w-full justify-start">
                   <ArrowRight className="w-3.5 h-3.5" />

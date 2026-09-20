@@ -5,6 +5,10 @@ import { prisma } from "@/lib/db";
 import { publishToFacebook, publishToInstagram } from "@/lib/social/meta";
 import { publishToTwitter } from "@/lib/social/twitter";
 import { publishToLinkedIn } from "@/lib/social/linkedin";
+import { extractProviderPostId } from "@/lib/analytics/metrics";
+import { campaignAccessWhere } from "@/lib/workspaces/access";
+import { safeQueueWebhookEvents } from "@/lib/webhooks/queue";
+import type { WebhookDispatch } from "@/lib/webhooks/events";
 
 const publishSchema = z.object({
   assetIds: z.array(z.string()),
@@ -21,8 +25,17 @@ export async function POST(
     const { assetIds } = publishSchema.parse(body);
 
     const campaign = await prisma.campaign.findFirst({
-      where: { id, userId: session.user.id },
-      include: { assets: { where: { id: { in: assetIds } } } },
+      where: campaignAccessWhere(session.user.id, id),
+      include: {
+        assets: { where: { id: { in: assetIds } } },
+        brand: {
+          select: {
+            id: true,
+            name: true,
+            workspaceId: true,
+          },
+        },
+      },
     });
 
     if (!campaign) {
@@ -33,6 +46,7 @@ export async function POST(
     }
 
     const results = [];
+    const webhookEvents: WebhookDispatch[] = [];
 
     for (const asset of campaign.assets) {
       const connection = await prisma.socialConnection.findFirst({
@@ -40,10 +54,35 @@ export async function POST(
       });
 
       if (!connection) {
+        const message = `No ${asset.platform} account connected`;
+        await prisma.asset.update({
+          where: { id: asset.id },
+          data: { status: "failed" },
+        });
         results.push({
           assetId: asset.id,
           status: "failed",
-          error: `No ${asset.platform} account connected`,
+          error: message,
+        });
+        webhookEvents.push({
+          workspaceId: campaign.brand.workspaceId,
+          event: "post.failed",
+          data: {
+            brand: {
+              id: campaign.brand.id,
+              name: campaign.brand.name,
+            },
+            campaign: {
+              id: campaign.id,
+              goal: campaign.goal,
+            },
+            post: {
+              id: asset.id,
+              platform: asset.platform,
+              status: "failed",
+            },
+            error: message,
+          },
         });
         continue;
       }
@@ -95,13 +134,50 @@ export async function POST(
             break;
         }
 
+        const providerPostId = extractProviderPostId(
+          result,
+          asset.platform
+        );
+        const publishedAt = new Date();
         await prisma.asset.update({
           where: { id: asset.id },
-          data: { status: "published", publishedAt: new Date() },
+          data: {
+            status: "published",
+            publishedAt,
+            ...(providerPostId ? { providerPostId } : {}),
+          },
         });
 
-        results.push({ assetId: asset.id, status: "published", result });
+        results.push({
+          assetId: asset.id,
+          status: "published",
+          result,
+          providerPostId,
+        });
+        webhookEvents.push({
+          workspaceId: campaign.brand.workspaceId,
+          event: "post.published",
+          data: {
+            brand: {
+              id: campaign.brand.id,
+              name: campaign.brand.name,
+            },
+            campaign: {
+              id: campaign.id,
+              goal: campaign.goal,
+            },
+            post: {
+              id: asset.id,
+              platform: asset.platform,
+              status: "published",
+              providerPostId: providerPostId ?? null,
+              publishedAt: publishedAt.toISOString(),
+            },
+          },
+        });
       } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Publish failed";
         await prisma.asset.update({
           where: { id: asset.id },
           data: { status: "failed" },
@@ -110,10 +186,32 @@ export async function POST(
         results.push({
           assetId: asset.id,
           status: "failed",
-          error: error instanceof Error ? error.message : "Publish failed",
+          error: message,
+        });
+        webhookEvents.push({
+          workspaceId: campaign.brand.workspaceId,
+          event: "post.failed",
+          data: {
+            brand: {
+              id: campaign.brand.id,
+              name: campaign.brand.name,
+            },
+            campaign: {
+              id: campaign.id,
+              goal: campaign.goal,
+            },
+            post: {
+              id: asset.id,
+              platform: asset.platform,
+              status: "failed",
+            },
+            error: message,
+          },
         });
       }
     }
+
+    await safeQueueWebhookEvents(prisma, webhookEvents);
 
     return NextResponse.json({ results });
   } catch (error) {
