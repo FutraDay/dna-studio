@@ -33,6 +33,11 @@ describe("resolveCredential", () => {
       .toEqual({ value: "", origin: "none", envVar: "HEYGEN_API_KEY" });
   });
 
+  it("resolves the ComfyUI url like any other credential", () => {
+    expect(resolveCredential("comfyUrl", "comfyui", {}, { COMFYUI_BASE_URL: "http://comfy:8188" }))
+      .toEqual({ value: "http://comfy:8188", origin: "env", envVar: "COMFYUI_BASE_URL" });
+  });
+
   it("resolves the ollama url like any other credential", () => {
     expect(resolveCredential("ollamaUrl", "ollama", {}, { OLLAMA_BASE_URL: "http://ollama:11434" }))
       .toEqual({ value: "http://ollama:11434", origin: "env", envVar: "OLLAMA_BASE_URL" });
@@ -62,6 +67,11 @@ describe("resolveCredentialWithDefault", () => {
       .toEqual({ value: "http://localhost:11434", origin: "default", envVar: "OLLAMA_BASE_URL" });
   });
 
+  it("falls back to the documented ComfyUI base url", () => {
+    expect(resolveCredentialWithDefault("comfyUrl", "comfyui", {}, {}))
+      .toEqual({ value: "http://localhost:8188", origin: "default", envVar: "COMFYUI_BASE_URL" });
+  });
+
   it("does not invent a default for any other field", () => {
     expect(resolveCredentialWithDefault("llmApiKey", "openai", {}, {}).origin).toBe("none");
   });
@@ -81,6 +91,11 @@ describe("resolveProviders", () => {
   it("falls back to the documented environment variables", () => {
     expect(resolveProviders({}, { LLM_PROVIDER: "anthropic", IMAGE_PROVIDER: "stability", VIDEO_PROVIDER: "heygen" }))
       .toEqual({ llmProvider: "anthropic", imageProvider: "stability", videoProvider: "heygen" });
+  });
+
+  it("forces the local image provider when LOCAL_IMAGE_ONLY is enabled", () => {
+    expect(resolveProviders({ imageProvider: "openai" }, { LOCAL_IMAGE_ONLY: "true", IMAGE_PROVIDER: "stability" }).imageProvider)
+      .toBe("comfyui");
   });
 
   it("falls back to the defaults when nothing is set", () => {

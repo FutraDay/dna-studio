@@ -8,7 +8,7 @@ describe("provider registry", () => {
       ["anthropic", "gemini", "ollama", "openai"]
     );
     expect(providersOfKind("image").map((p) => p.id).sort()).toEqual(
-      ["gemini", "openai", "replicate", "stability"]
+      ["comfyui", "gemini", "openai", "replicate", "stability"]
     );
     expect(providersOfKind("video").map((p) => p.id).sort()).toEqual(
       ["did", "heygen", "veo"]
@@ -32,9 +32,21 @@ describe("provider registry", () => {
     expect(missing).toEqual([]);
   });
 
-  it("routes each kind to its own settings field", () => {
-    expect(providersOfKind("image").every((p) => p.credential.field === "imageApiKey")).toBe(true);
+  it("routes hosted providers to keys and local providers to URLs", () => {
+    expect(
+      providersOfKind("image")
+        .filter((p) => p.id !== "comfyui")
+        .every((p) => p.credential.field === "imageApiKey")
+    ).toBe(true);
+    expect(findProvider("image", "comfyui")?.credential.field).toBe("comfyUrl");
     expect(providersOfKind("video").every((p) => p.credential.field === "videoApiKey")).toBe(true);
+  });
+
+  it("gives ComfyUI a local URL credential and no API key", () => {
+    const comfy = findProvider("image", "comfyui")!;
+    expect(comfy.credential.type).toBe("url");
+    expect(comfy.credential.field).toBe("comfyUrl");
+    expect(comfy.credential.envVar).toBe("COMFYUI_BASE_URL");
   });
 
   it("gives ollama a url credential and no api key", () => {
@@ -114,6 +126,36 @@ describe("provider test()", () => {
 
 // The Ollama test is the one path where a signed-in user names the host the
 // server calls. It must not become a general-purpose probe.
+describe("ComfyUI url hardening", () => {
+  const fetchMock = vi.fn();
+  const comfy = findProvider("image", "comfyui")!;
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockResolvedValue({ ok: true, status: 200 });
+  });
+
+  it("rejects non-http schemes without calling out", async () => {
+    await expect(comfy.test("file:///etc/passwd")).rejects.toThrow(/http/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("normalises the configured URL to the ComfyUI health endpoint", async () => {
+    await comfy.test("http://localhost:8188/custom/path?probe=1#fragment");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8188/system_stats",
+      { headers: {}, signal: expect.any(AbortSignal) }
+    );
+  });
+
+  it("reports an unreachable ComfyUI instance without leaking the URL", async () => {
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+    const message = await comfy.test("http://secret-host:8188").catch((error: Error) => error.message);
+    expect(message).toBe("Could not reach ComfyUI.");
+    expect(message).not.toContain("secret-host");
+  });
+});
+
 describe("ollama url hardening", () => {
   const fetchMock = vi.fn();
   const ollama = findProvider("llm", "ollama")!;

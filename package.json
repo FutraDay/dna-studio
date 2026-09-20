@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "comfyui:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-comfyui.ps1",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

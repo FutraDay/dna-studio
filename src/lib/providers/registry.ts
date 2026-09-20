@@ -4,7 +4,8 @@ export type CredentialField =
   | "llmApiKey"
   | "imageApiKey"
   | "videoApiKey"
-  | "ollamaUrl";
+  | "ollamaUrl"
+  | "comfyUrl";
 
 export interface ProviderDef {
   id: string;
@@ -43,6 +44,19 @@ function ollamaTagsUrl(raw: string): string {
     throw new Error("Only http:// and https:// URLs can be tested.");
   }
   return `${parsed.origin}/api/tags`;
+}
+
+function comfySystemStatsUrl(raw: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error("That does not look like a valid URL.");
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("Only http:// and https:// URLs can be tested.");
+  }
+  return `${parsed.origin}/system_stats`;
 }
 
 /** Turns a fetch response into the message a user should read. */
@@ -106,6 +120,16 @@ export const PROVIDERS: ProviderDef[] = [
     modelLabel: "Llama 3.1 · local",
     credential: { field: "ollamaUrl", type: "url", envVar: "OLLAMA_BASE_URL", placeholder: "http://localhost:11434" },
     test: async (url) => getWithHeaders(ollamaTagsUrl(url), {}, "Ollama"),
+  },
+  {
+    id: "comfyui",
+    kind: "image",
+    label: "Local ComfyUI",
+    modelLabel: "Local GPU ? Free",
+    credential: { field: "comfyUrl", type: "url", envVar: "COMFYUI_BASE_URL", placeholder: "http://localhost:8188" },
+    test: async (url) => {
+      await getWithHeaders(comfySystemStatsUrl(url), {}, "ComfyUI");
+    },
   },
   {
     id: "openai",

@@ -250,6 +250,18 @@ describe("GET /api/settings sources", () => {
   });
 
   // A base URL is configuration, not a secret: masking it renders as corruption.
+  it("reports ComfyUI's base URL as configuration rather than a secret", async () => {
+    user.findUnique.mockResolvedValue({ settings: { comfyUrl: "http://gpu-box.local:8188" } } as never);
+
+    const body = await (await getSettings()).json();
+
+    expect(body.sources.comfyUrl).toMatchObject({
+      source: "user",
+      masked: "http://gpu-box.local:8188",
+      envVar: "COMFYUI_BASE_URL",
+    });
+  });
+
   it("does not mask a url credential", async () => {
     user.findUnique.mockResolvedValue({ settings: { ollamaUrl: "http://box.local:11434" } } as never);
 
@@ -285,7 +297,7 @@ describe("GET /api/settings sources", () => {
     const body = await (await getSettings()).json();
 
     expect(Object.keys(body.sources).sort()).toEqual(
-      ["imageApiKey", "llmApiKey", "ollamaUrl", "videoApiKey"]
+      ["comfyUrl", "imageApiKey", "llmApiKey", "ollamaUrl", "videoApiKey"]
     );
   });
 

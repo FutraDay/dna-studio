@@ -80,6 +80,7 @@ export default function CampaignPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
   const [imageGenProgress, setImageGenProgress] = useState<{ done: number; total: number } | null>(null);
+  const [localImageMode, setLocalImageMode] = useState(false);
   const [variantAction, setVariantAction] = useState<"create" | "select" | null>(null);
 
   useEffect(() => {
@@ -87,6 +88,11 @@ export default function CampaignPage() {
       .then((r) => r.json())
       .then(setCampaign)
       .finally(() => setLoading(false));
+
+    fetch("/api/settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setLocalImageMode(data?.effective?.imageProvider === "comfyui"))
+      .catch(() => setLocalImageMode(false));
   }, [params.id]);
 
   const refreshCampaign = async () => {
@@ -134,7 +140,9 @@ export default function CampaignPage() {
     if (pending.length === 0) return;
 
     const confirmed = window.confirm(
-      `Generate ${pending.length} images now? This will call your configured image provider and may consume paid API credits. No images are generated unless you confirm.`
+      localImageMode
+        ? `Generate ${pending.length} images locally with ComfyUI? This uses your GPU but no API credits.`
+        : `Generate ${pending.length} images now? This will call your configured image provider and may consume paid API credits. No images are generated unless you confirm.`
     );
     if (!confirmed) return;
 
@@ -215,7 +223,9 @@ export default function CampaignPage() {
 
   const handleGenerateImage = async (assetId: string, prompt: string): Promise<string | null> => {
     const confirmed = window.confirm(
-      "Generate this image now? This will call your configured image provider and may consume paid API credits."
+      localImageMode
+        ? "Generate this image locally with ComfyUI? This uses your GPU but no API credits."
+        : "Generate this image now? This will call your configured image provider and may consume paid API credits."
     );
     if (!confirmed) return null;
 
@@ -435,7 +445,9 @@ export default function CampaignPage() {
               <div>
                 <p className="text-xs font-medium">Images are generated on demand</p>
                 <p className="text-[11px] text-muted mt-0.5">
-                  Review the copy first. Generating images uses your configured image-provider API credits.
+                  {localImageMode
+                    ? "Local ComfyUI is active. Images use your GPU and no API credits. Local images are for preview/testing; use a hosted image provider for public social publishing."
+                    : "Review the copy first. Generating images uses your configured image-provider API credits."}
                 </p>
               </div>
               {campaign.assets.some((asset) => asset.imagePrompt && !asset.imageUrl) && (
@@ -446,7 +458,7 @@ export default function CampaignPage() {
                 >
                   {imageGenProgress
                     ? `${imageGenProgress.done}/${imageGenProgress.total}`
-                    : `Generate ${campaign.assets.filter((asset) => asset.imagePrompt && !asset.imageUrl).length} images (uses credits)`}
+                    : `Generate ${campaign.assets.filter((asset) => asset.imagePrompt && !asset.imageUrl).length} images ${localImageMode ? "- Free Local" : "(uses credits)"}`}
                 </Button>
               )}
             </div>
@@ -501,6 +513,7 @@ export default function CampaignPage() {
                         onSchedule={handleSchedule}
                         onUpdateCaption={handleUpdateCaption}
                         onGenerateImage={handleGenerateImage}
+                        freeLocalImages={localImageMode}
                       />
                     ))}
                   </div>
@@ -524,6 +537,7 @@ export default function CampaignPage() {
                         onSchedule={handleSchedule}
                         onUpdateCaption={handleUpdateCaption}
                         onGenerateImage={handleGenerateImage}
+                        freeLocalImages={localImageMode}
                       />
                     ))}
                   </div>

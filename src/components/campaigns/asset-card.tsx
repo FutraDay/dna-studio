@@ -35,6 +35,7 @@ interface AssetCardProps {
   onSchedule?: (id: string, date: string) => void;
   onUpdateCaption?: (id: string, caption: string) => Promise<boolean>;
   onGenerateImage?: (id: string, prompt: string) => Promise<string | null>;
+  freeLocalImages?: boolean;
 }
 
 const platformIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -57,6 +58,7 @@ export function AssetCard({
   onSchedule,
   onUpdateCaption,
   onGenerateImage,
+  freeLocalImages = false,
 }: AssetCardProps) {
   const [editing, setEditing] = useState(false);
   const [caption, setCaption] = useState(asset.caption);
@@ -277,7 +279,11 @@ export function AssetCard({
               disabled={generatingImage}
             >
               <Sparkles className="w-3 h-3" />
-              {generatingImage ? "Generating..." : "Generate Image · Uses Credits"}
+              {generatingImage
+                ? "Generating..."
+                : freeLocalImages
+                  ? "Generate Image - Free Local"
+                  : "Generate Image - Uses Credits"}
             </Button>
           )}
 
