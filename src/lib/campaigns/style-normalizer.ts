@@ -19,6 +19,23 @@ const CLICHE_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bready to\b/gi, "the next step can be to"],
   [/\btired of\b/gi, "dealing with"],
 ];
+
+const GENERIC_COPY_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\bhey business owners\b/gi, "Australian operators dealing with repeated admin"],
+  [/\bwe want to hear from you\b/gi, "share the workflow creating the most friction"],
+  [/\bour software solutions\b/gi, "software built around the actual workflow"],
+  [/\bboost your business efficiency\b/gi, "reduce repeated manual steps"],
+  [/\bfocus on growth\b/gi, "spend less time on repeated admin"],
+  [/\bstreamline your operations\b/gi, "remove unnecessary handoffs"],
+  [/\bget started\b/gi, "map the first bottleneck"],
+  [/\bditch manual processes for good\b/gi, "replace the repeated manual step"],
+  [/\bthe benefits of automation\b/gi, "where automation removes repeated work"],
+  [/\bthe solution to manual business processes\b/gi, "a workflow built around the actual process"],
+  [/\bincreased efficiency, reduced costs,? and improved accuracy\b/gi, "less repeated admin and clearer handoffs"],
+];
+
+const EMOJI_PATTERN = /\p{Extended_Pictographic}\uFE0F?/gu;
+
 const LEADS: Record<CampaignStrategy, Record<string, string>> = {
   problem_awareness: {
     instagram: "Everyday workflow friction is visible in the tasks people repeat.",
@@ -235,6 +252,26 @@ function replaceCliches(caption: string): string {
   );
 }
 
+function replaceGenericCopy(caption: string): string {
+  return GENERIC_COPY_REPLACEMENTS.reduce(
+    (text, [pattern, replacement]) =>
+      text.replace(pattern, (match) =>
+        /^[A-Z]/.test(match)
+          ? replacement.charAt(0).toUpperCase() + replacement.slice(1)
+          : replacement
+      ),
+    caption
+  );
+}
+
+function removeEmojis(caption: string): string {
+  return caption
+    .replace(EMOJI_PATTERN, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\s+([,.;!?])/g, "$1")
+    .trim();
+}
+
 export function normalizeCampaignStyle(campaign: GeneratedCampaign): GeneratedCampaign {
   const seenHashtagSets = new Set<string>();
   let questionHooksKept = 0;
@@ -281,6 +318,33 @@ export function normalizeCampaignStyle(campaign: GeneratedCampaign): GeneratedCa
   };
 }
 
+
+export function scopeCampaignPlatforms(
+  campaign: GeneratedCampaign,
+  requestedPlatforms: string[]
+): GeneratedCampaign {
+  const requested = [...new Set(requestedPlatforms.filter(Boolean))];
+  if (requested.length === 0) return normalizeCampaignStyle(campaign);
+
+  const normalized = normalizeCampaignStyle(campaign);
+  return {
+    concepts: normalized.concepts.map((concept) => {
+      const byPlatform = new Map<string, (typeof concept.assets)[number]>();
+      for (const asset of concept.assets) {
+        if (!requested.includes(asset.platform) || byPlatform.has(asset.platform)) continue;
+        byPlatform.set(asset.platform, asset);
+      }
+
+      return {
+        ...concept,
+        assets: requested
+          .map((platform) => byPlatform.get(platform))
+          .filter((asset): asset is (typeof concept.assets)[number] => Boolean(asset)),
+      };
+    }),
+  };
+}
+
 export function repairCampaignDeterministically(
   campaign: GeneratedCampaign,
   issues: Array<{ code?: string; message: string }>
@@ -311,6 +375,8 @@ export function repairCampaignDeterministically(
       for (const entity of entityPhrases) caption = caption.split(entity).join("a hypothetical business");
       for (const offer of offerPhrases) caption = caption.split(offer).join("a practical next step");
       for (const resource of resourcePhrases) caption = caption.split(resource).join("an inline example");
+      if (codes.has("generic_copy")) caption = replaceGenericCopy(caption);
+      if (codes.has("emoji_overuse")) caption = removeEmojis(caption);
 
       const cta = codes.has("repeated_cta")
         ? CTA_VARIANTS[strategy]?.[asset.platform] ?? (typeof asset.cta === "string" ? asset.cta : "Review the next practical step.")

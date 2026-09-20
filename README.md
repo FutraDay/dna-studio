@@ -292,7 +292,7 @@ dna-studio/
 - [x] UGC video generation with creator avatars (Veo, HeyGen, D-ID)
 - [x] Health endpoint (`/api/health`) and container healthcheck
 - [x] CI on every pull request — migrations, entrypoint, web build, Expo Android bundle, and a full `docker compose` boot
-- [x] Test suite — 852 tests across the library, API routes, analytics, calendar, team collaboration, PDF export, webhooks, Chrome extension/mobile auth flows, and key React UI flows, with a coverage gate in CI
+- [x] Test suite — 859 tests across the library, API routes, analytics, calendar, team collaboration, PDF export, webhooks, Chrome extension/mobile auth flows, and key React UI flows, with a coverage gate in CI
 
 ### Up Next
 

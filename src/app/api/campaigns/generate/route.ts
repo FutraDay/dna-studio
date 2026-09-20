@@ -5,7 +5,7 @@ import { requireSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { repairCampaign, streamCampaign, type GeneratedCampaign } from "@/lib/campaigns/generator";
 import { formatCampaignQualityError, validateCampaignQuality } from "@/lib/campaigns/quality";
-import { normalizeCampaignStyle, repairCampaignDeterministically } from "@/lib/campaigns/style-normalizer";
+import { normalizeCampaignStyle, repairCampaignDeterministically, scopeCampaignPlatforms } from "@/lib/campaigns/style-normalizer";
 import type { BrandDNA } from "@/lib/brand-dna/types";
 import { brandAccessWhere } from "@/lib/workspaces/access";
 import { safeQueueWebhookEvents } from "@/lib/webhooks/queue";
@@ -56,13 +56,21 @@ export async function POST(request: Request) {
           // Parse the completed content and save
           const match = fullContent.match(/\{[\s\S]*\}/);
           if (!match) throw new Error("LLM did not return valid JSON for campaign");
-          let generated = normalizeCampaignStyle(JSON.parse(match[0]) as GeneratedCampaign);
+          let generated = scopeCampaignPlatforms(
+            normalizeCampaignStyle(JSON.parse(match[0]) as GeneratedCampaign),
+            platforms
+          );
           let quality = validateCampaignQuality(generated, dna, goal, platforms);
           if (!quality.passed) {
             generated = repairCampaignDeterministically(generated, quality.issues);
             quality = validateCampaignQuality(generated, dna, goal, platforms);
           }
           let repairAttempts = 0;
+          // Local inference is intentionally bounded: deterministic repair runs
+          // first, then Ollama gets at most one full rewrite. Hosted providers
+          // retain the existing three-attempt ceiling.
+          const maxRepairAttempts =
+            process.env.LOCAL_LLM_ONLY === "true" ? 1 : 3;
 
           const blockingCodes = new Set([
             "concept_count",
@@ -90,9 +98,10 @@ export async function POST(request: Request) {
             "repetitive_visuals",
           ]);
 
-          while (!quality.passed && repairAttempts < 3) {
-            generated = normalizeCampaignStyle(
-              await repairCampaign(
+          while (!quality.passed && repairAttempts < maxRepairAttempts) {
+            generated = scopeCampaignPlatforms(
+              normalizeCampaignStyle(
+                await repairCampaign(
                 dna,
                 goal,
                 platforms,
@@ -100,6 +109,8 @@ export async function POST(request: Request) {
                 generated,
                 quality.issues
               )
+              ),
+              platforms
             );
             repairAttempts += 1;
             quality = validateCampaignQuality(generated, dna, goal, platforms);

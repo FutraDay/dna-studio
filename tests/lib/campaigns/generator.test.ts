@@ -40,10 +40,21 @@ describe("generateCampaign", () => {
     expect(messages[1].content).toContain("LANGUAGE: English");
   });
 
-  it("asks for JSON with room for a long response", async () => {
+  it("scales the output budget with the number of selected platforms", async () => {
+    await generateCampaign(dna, "goal", ["instagram", "linkedin", "facebook", "twitter"]);
+
+    expect(json).toHaveBeenLastCalledWith(expect.anything(), {
+      maxTokens: 5120,
+      contextTokens: 8192,
+      temperature: 0.8,
+      json: true,
+    });
+  });
+
+  it("bounds one-platform output while preserving the full context window", async () => {
     await generateCampaign(dna, "goal", ["instagram"]);
     expect(json).toHaveBeenCalledWith(expect.anything(), {
-      maxTokens: 8192,
+      maxTokens: 2048,
       contextTokens: 8192,
       temperature: 0.8,
       json: true,
@@ -74,7 +85,7 @@ describe("streamCampaign", () => {
     }
 
     expect(stream).toHaveBeenCalledWith(expect.anything(), {
-      maxTokens: 8192,
+      maxTokens: 2048,
       contextTokens: 8192,
       temperature: 0.8,
       json: true,
@@ -120,7 +131,7 @@ describe("repairCampaign", () => {
     expect(messages[1].content).toContain("worried about");
     expect(messages[1].content).toContain("Every asset must have a distinct opening phrase");
     expect(json).toHaveBeenLastCalledWith(expect.anything(), {
-      maxTokens: 8192,
+      maxTokens: 3072,
       contextTokens: 8192,
       temperature: 0.1,
       json: true,
@@ -135,7 +146,7 @@ describe("repairCampaign", () => {
     ]);
 
     expect(json).toHaveBeenLastCalledWith(expect.anything(), {
-      maxTokens: 8192,
+      maxTokens: 2048,
       contextTokens: 8192,
       temperature: 0.3,
       json: true,

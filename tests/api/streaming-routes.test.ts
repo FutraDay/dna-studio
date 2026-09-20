@@ -464,6 +464,22 @@ describe("POST /api/campaigns/generate", () => {
     expect(campaign.create).toHaveBeenCalled();
   });
 
+  it("caps local-only LLM repair at one full rewrite", async () => {
+    vi.stubEnv("LOCAL_LLM_ONLY", "true");
+    const invalid = { concepts: CONCEPTS.concepts.slice(0, 2) };
+    stream.mockImplementation(async function* () {
+      yield JSON.stringify(invalid);
+    } as never);
+    repair.mockResolvedValue(invalid as never);
+
+    const events = await readEvents(await generate(post("/api/campaigns/generate", validBody)));
+
+    expect(repair).toHaveBeenCalledTimes(1);
+    expect(events.at(-1)).toMatchObject({ type: "error" });
+    expect(events.at(-1).message).toContain("Campaign quality check failed");
+    expect(campaign.create).not.toHaveBeenCalled();
+  });
+
   it("repairs editorial quality warnings deterministically before saving", async () => {
     const editorialInvalid = JSON.parse(JSON.stringify(CONCEPTS));
     editorialInvalid.concepts.slice(0, 3).forEach((concept: { assets: Array<{ caption: string }> }, index: number) => {

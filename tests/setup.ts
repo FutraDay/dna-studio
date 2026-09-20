@@ -14,6 +14,7 @@ if (typeof window !== "undefined") {
 // developer's real .env.
 const PROVIDER_ENV_KEYS = [
   "LLM_PROVIDER",
+  "LOCAL_LLM_ONLY",
   "IMAGE_PROVIDER",
   "VIDEO_PROVIDER",
   "OPENAI_API_KEY",
