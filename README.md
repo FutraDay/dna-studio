@@ -318,6 +318,10 @@ dna-studio/
 - [x] CI on every pull request — migrations, entrypoint, web build, Expo Android bundle, and a full `docker compose` boot
 - [x] Test suite — 879 tests across the library, API routes, analytics, calendar, team collaboration, PDF export, webhooks, Chrome extension/mobile auth flows, and key React UI flows, with a coverage gate in CI
 
+### Shipped in v0.3.0
+
+- [x] Free local image testing with ComfyUI - GPU-backed campaign previews, `LOCAL_IMAGE_ONLY` safety lock, authenticated local-image proxying, Docker host-bridge support, one-command Windows launcher, and explicit **Free Local** campaign controls
+
 ### Up Next
 
 - [x] Component and page tests — campaign asset actions, sidebar brand navigation, and dashboard onboarding/redirect flows
