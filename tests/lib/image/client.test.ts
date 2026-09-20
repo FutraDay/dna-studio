@@ -7,11 +7,13 @@ const OpenAIImageProvider = vi.fn();
 const StabilityProvider = vi.fn();
 const ReplicateProvider = vi.fn();
 const GeminiImageProvider = vi.fn();
+const ComfyUIProvider = vi.fn();
 
 vi.mock("@/lib/image/providers/openai", () => ({ OpenAIImageProvider }));
 vi.mock("@/lib/image/providers/stability", () => ({ StabilityProvider }));
 vi.mock("@/lib/image/providers/replicate", () => ({ ReplicateProvider }));
 vi.mock("@/lib/image/providers/gemini", () => ({ GeminiImageProvider }));
+vi.mock("@/lib/image/providers/comfyui", () => ({ ComfyUIProvider }));
 
 const settings = (overrides: Record<string, string> = {}) => ({
   llmProvider: "openai",
@@ -20,6 +22,7 @@ const settings = (overrides: Record<string, string> = {}) => ({
   ollamaUrl: "http://localhost:11434",
   imageProvider: "openai",
   imageApiKey: "sk-image",
+  comfyUrl: "http://localhost:8188",
   videoProvider: "veo",
   videoApiKey: "",
   ...overrides,
@@ -47,6 +50,14 @@ describe("getImageProvider", () => {
     const { getImageProvider } = await freshClient();
     await getImageProvider();
     expect(ctor()).toHaveBeenCalledWith("key");
+  });
+
+  it("builds the local ComfyUI provider with the resolved base URL", async () => {
+    resolveSettings.mockResolvedValue(settings({ imageProvider: "comfyui", imageApiKey: "", comfyUrl: "http://gpu:8188" }));
+    const { getImageProvider } = await freshClient();
+    await getImageProvider();
+    expect(ComfyUIProvider).toHaveBeenCalledWith("http://gpu:8188");
+    expect(OpenAIImageProvider).not.toHaveBeenCalled();
   });
 
   it("passes undefined rather than an empty key", async () => {
@@ -83,6 +94,15 @@ describe("getImageProvider", () => {
     const { getImageProvider } = await freshClient();
     await getImageProvider();
     expect(StabilityProvider).toHaveBeenCalledWith(undefined);
+  });
+
+  it("forces ComfyUI in fallback mode when LOCAL_IMAGE_ONLY is enabled", async () => {
+    resolveSettings.mockRejectedValue(new Error("no session"));
+    vi.stubEnv("LOCAL_IMAGE_ONLY", "true");
+    vi.stubEnv("COMFYUI_BASE_URL", "http://host.docker.internal:8188");
+    const { getImageProvider } = await freshClient();
+    await getImageProvider();
+    expect(ComfyUIProvider).toHaveBeenCalledWith("http://host.docker.internal:8188");
   });
 
   it("defaults to openai when nothing is configured at all", async () => {

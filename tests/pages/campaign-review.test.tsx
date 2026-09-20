@@ -120,6 +120,10 @@ describe("Campaign review A/B controls", () => {
       async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
 
+        if (url === "/api/settings" && !init?.method) {
+          return response({ effective: { imageProvider: "openai" } });
+        }
+
         if (url === "/api/campaigns/camp_a" && !init?.method) {
           campaignReads += 1;
           return response(
@@ -189,6 +193,10 @@ describe("Campaign review A/B controls", () => {
       async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
 
+        if (url === "/api/settings" && !init?.method) {
+          return response({ effective: { imageProvider: "openai" } });
+        }
+
         if (url === "/api/campaigns/camp_a" && !init?.method) {
           campaignReads += 1;
           return response(
@@ -234,6 +242,24 @@ describe("Campaign review A/B controls", () => {
         String(url).includes("/publish")
       )
     ).toBe(false);
+  });
+
+  it("shows free-local image controls when ComfyUI is the effective provider", async () => {
+    const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/campaigns/camp_a") return response(baseCampaign);
+      if (url === "/api/settings") {
+        return response({ effective: { imageProvider: "comfyui" } });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<CampaignPage />);
+
+    expect(await screen.findByText(/local comfyui is active/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /generate 1 images - free local/i })).toBeInTheDocument();
+    expect(screen.queryByText(/uses your configured image-provider api credits/i)).not.toBeInTheDocument();
   });
 
   it("shows the preferred state without offering a second selection action", async () => {

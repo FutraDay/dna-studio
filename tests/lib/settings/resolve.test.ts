@@ -28,6 +28,7 @@ describe("resolveSettings", () => {
         ollamaUrl: "http://localhost:11434",
         imageProvider: "openai",
         imageApiKey: "",
+        comfyUrl: "http://localhost:8188",
         videoProvider: "veo",
         videoApiKey: "",
       });
@@ -93,6 +94,18 @@ describe("resolveSettings", () => {
     it("honours per-provider model overrides", async () => {
       vi.stubEnv("OPENAI_MODEL", "gpt-4o-mini");
       expect((await resolveSettings()).llmModel).toBe("gpt-4o-mini");
+    });
+
+    it("forces ComfyUI and clears hosted image keys in local-image-only mode", async () => {
+      vi.stubEnv("LOCAL_IMAGE_ONLY", "true");
+      vi.stubEnv("COMFYUI_BASE_URL", "http://host.docker.internal:8188");
+      vi.stubEnv("OPENAI_API_KEY", "sk-paid-image");
+      signedIn({ imageProvider: "openai", imageApiKey: "sk-saved-paid" });
+
+      const settings = await resolveSettings();
+      expect(settings.imageProvider).toBe("comfyui");
+      expect(settings.imageApiKey).toBe("");
+      expect(settings.comfyUrl).toBe("http://host.docker.internal:8188");
     });
 
     it("resolves the image provider key independently of the LLM one", async () => {

@@ -37,6 +37,7 @@ const settingsPatchSchema = z
     ollamaUrl: z.string(),
     imageProvider: z.enum(idsOf("image")),
     imageApiKey: z.string(),
+    comfyUrl: z.string(),
     videoProvider: z.enum(idsOf("video")),
     videoApiKey: z.string(),
   })
@@ -70,7 +71,8 @@ function buildSources(settings: UserSettings, effective: EffectiveProviders) {
   const sources: Record<string, unknown> = {};
   for (const field of CREDENTIAL_FIELDS) {
     const kind = KIND_OF_FIELD[field];
-    const providerId = field === "ollamaUrl" ? "ollama" : effective[`${kind}Provider`];
+    const providerId =
+      field === "ollamaUrl" ? "ollama" : field === "comfyUrl" ? "comfyui" : effective[`${kind}Provider`];
 
     const { origin, envVar, value } = resolveCredentialWithDefault(field, providerId, settings);
     // A base URL is configuration, not a secret. Masking it would show the user

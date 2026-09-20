@@ -9,6 +9,7 @@ export interface ResolvedSettings {
   ollamaUrl: string;
   imageProvider: string;
   imageApiKey: string;
+  comfyUrl: string;
   videoProvider: string;
   videoApiKey: string;
 }
@@ -20,6 +21,7 @@ export interface UserSettings {
   ollamaUrl?: string;
   imageProvider?: string;
   imageApiKey?: string;
+  comfyUrl?: string;
   videoProvider?: string;
   videoApiKey?: string;
 }
@@ -28,6 +30,7 @@ export type CredentialOrigin = "user" | "env" | "default" | "none";
 
 /** Ollama serves here out of the box, so an unset base URL is still a working one. */
 export const DEFAULT_OLLAMA_URL = "http://localhost:11434";
+export const DEFAULT_COMFYUI_URL = "http://localhost:8188";
 
 export interface ResolvedCredential {
   value: string;
@@ -39,6 +42,7 @@ const KIND_OF_FIELD: Record<CredentialField, ProviderKind> = {
   llmApiKey: "llm",
   ollamaUrl: "llm",
   imageApiKey: "image",
+  comfyUrl: "image",
   videoApiKey: "video",
 };
 
@@ -80,8 +84,14 @@ export function resolveCredentialWithDefault(
   env: Partial<NodeJS.ProcessEnv> = process.env
 ): ResolvedCredential {
   const resolved = resolveCredential(field, providerId, userSettings, env);
-  if (resolved.value || field !== "ollamaUrl") return resolved;
-  return { value: DEFAULT_OLLAMA_URL, origin: "default", envVar: resolved.envVar };
+  if (resolved.value) return resolved;
+  if (field === "ollamaUrl") {
+    return { value: DEFAULT_OLLAMA_URL, origin: "default", envVar: resolved.envVar };
+  }
+  if (field === "comfyUrl") {
+    return { value: DEFAULT_COMFYUI_URL, origin: "default", envVar: resolved.envVar };
+  }
+  return resolved;
 }
 
 export interface EffectiveProviders {
@@ -101,9 +111,10 @@ export function resolveProviders(
   env: Partial<NodeJS.ProcessEnv> = process.env
 ): EffectiveProviders {
   const localLlmOnly = /^(?:1|true|yes)$/i.test(env.LOCAL_LLM_ONLY || "");
+  const localImageOnly = /^(?:1|true|yes)$/i.test(env.LOCAL_IMAGE_ONLY || "");
   return {
     llmProvider: localLlmOnly ? "ollama" : userSettings.llmProvider || env.LLM_PROVIDER || "openai",
-    imageProvider: userSettings.imageProvider || env.IMAGE_PROVIDER || "openai",
+    imageProvider: localImageOnly ? "comfyui" : userSettings.imageProvider || env.IMAGE_PROVIDER || "openai",
     videoProvider: userSettings.videoProvider || env.VIDEO_PROVIDER || "veo",
   };
 }
@@ -130,6 +141,7 @@ export async function resolveSettings(): Promise<ResolvedSettings> {
   }
 
   const localLlmOnly = /^(?:1|true|yes)$/i.test(process.env.LOCAL_LLM_ONLY || "");
+  const localImageOnly = /^(?:1|true|yes)$/i.test(process.env.LOCAL_IMAGE_ONLY || "");
   const { llmProvider, imageProvider, videoProvider } = resolveProviders(userSettings);
 
   const llmApiKey = localLlmOnly
@@ -155,7 +167,13 @@ export async function resolveSettings(): Promise<ResolvedSettings> {
     }
   }
 
-  const imageApiKey = resolveCredential("imageApiKey", imageProvider, userSettings).value;
+  const imageApiKey = imageProvider === "comfyui"
+    ? ""
+    : resolveCredential("imageApiKey", imageProvider, userSettings).value;
+
+  const comfyUrl = localImageOnly
+    ? process.env.COMFYUI_BASE_URL || DEFAULT_COMFYUI_URL
+    : resolveCredentialWithDefault("comfyUrl", "comfyui", userSettings).value;
 
   const videoApiKey = resolveCredential("videoApiKey", videoProvider, userSettings).value;
 
@@ -170,6 +188,7 @@ export async function resolveSettings(): Promise<ResolvedSettings> {
     ollamaUrl,
     imageProvider,
     imageApiKey,
+    comfyUrl,
     videoProvider,
     videoApiKey,
   };

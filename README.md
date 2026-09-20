@@ -163,8 +163,32 @@ All configuration is done via environment variables. See [`.env.example`](.env.e
 | `ANTHROPIC_API_KEY` | Anthropic API key (if using Anthropic) | Conditional |
 | `GOOGLE_API_KEY` | Google API key (if using Gemini) | Conditional |
 | `OLLAMA_BASE_URL` | Ollama server URL (if using local models) | Conditional |
-| `IMAGE_PROVIDER` | Image generation: `openai`, `gemini`, `stability`, `replicate` | No (defaults to `openai`) |
+| `IMAGE_PROVIDER` | Image generation: `openai`, `gemini`, `stability`, `replicate`, `comfyui` | No (defaults to `openai`) |
+| `LOCAL_IMAGE_ONLY` | Set `true` to force free local ComfyUI and block hosted image providers | No |
+| `COMFYUI_BASE_URL` | ComfyUI URL (`http://host.docker.internal:8188` from Docker Desktop) | Conditional |
+| `COMFYUI_CHECKPOINT` | Optional installed ComfyUI checkpoint; auto-detected when blank | No |
 | `VIDEO_PROVIDER` | UGC video generation: `veo`, `heygen`, `did` | No (defaults to `veo`) |
+
+### Free local image testing with ComfyUI
+
+DNA Studio can generate campaign preview images on a local GPU without API credits. On Windows, install ComfyUI under `$HOME\ComfyUI`, then start the local backend with:
+
+```powershell
+npm run comfyui:start
+```
+
+The launcher binds ComfyUI to `127.0.0.1:8188`, disables custom nodes for this workflow, and uses low-VRAM mode. For Docker Desktop, configure:
+
+```env
+IMAGE_PROVIDER=comfyui
+LOCAL_IMAGE_ONLY=true
+COMFYUI_BASE_URL=http://host.docker.internal:8188
+COMFYUI_CHECKPOINT=DreamShaper_8_pruned.safetensors
+```
+
+With `LOCAL_IMAGE_ONLY=true`, saved or environment-configured hosted image providers cannot be selected at runtime. Campaign review then labels image actions **Free Local**. Generate one image first to inspect the campaign prompt, then generate the remaining previews if the direction looks useful.
+
+Local ComfyUI images are private preview/testing assets served through DNA Studio. They are not public CDN URLs, so use a hosted image provider or upload the approved creative to public storage before social publishing.
 
 ## Troubleshooting
 
@@ -292,7 +316,7 @@ dna-studio/
 - [x] UGC video generation with creator avatars (Veo, HeyGen, D-ID)
 - [x] Health endpoint (`/api/health`) and container healthcheck
 - [x] CI on every pull request — migrations, entrypoint, web build, Expo Android bundle, and a full `docker compose` boot
-- [x] Test suite — 859 tests across the library, API routes, analytics, calendar, team collaboration, PDF export, webhooks, Chrome extension/mobile auth flows, and key React UI flows, with a coverage gate in CI
+- [x] Test suite — 879 tests across the library, API routes, analytics, calendar, team collaboration, PDF export, webhooks, Chrome extension/mobile auth flows, and key React UI flows, with a coverage gate in CI
 
 ### Up Next
 

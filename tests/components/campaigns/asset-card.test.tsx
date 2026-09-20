@@ -130,6 +130,19 @@ describe("AssetCard", () => {
     expect(onPublish).toHaveBeenCalledWith("asset_1");
   });
 
+  it("labels image generation as free when local ComfyUI mode is active", () => {
+    render(
+      <AssetCard
+        asset={{ ...baseAsset, imagePrompt: "Local image prompt" }}
+        onGenerateImage={vi.fn()}
+        freeLocalImages
+      />
+    );
+
+    expect(screen.getByRole("button", { name: /generate image - free local/i })).toBeInTheDocument();
+    expect(screen.queryByText(/uses credits/i)).not.toBeInTheDocument();
+  });
+
   it("generates an image only after explicit user action", async () => {
     const user = userEvent.setup();
     const onGenerateImage = vi
