@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "DNA Studio",
+    "slug": "dna-studio-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": ["**/*"],
+    "android": {
+      "package": "com.dnastudio.mobile"
+    },
+    "ios": {
+      "bundleIdentifier": "com.dnastudio.mobile",
+      "supportsTablet": true
+    }
+  }
+}

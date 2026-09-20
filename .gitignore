@@ -13,6 +13,11 @@
 # testing
 /coverage
 
+# Expo mobile app generated files
+/apps/mobile/node_modules/
+/apps/mobile/.expo/
+/apps/mobile/dist/
+
 # next.js
 /.next/
 /out/

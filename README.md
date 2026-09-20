@@ -69,6 +69,8 @@ DNA Studio analyzes any website URL to extract a **Brand DNA** profile — color
 
 - **Chrome Brand Analyzer** — Analyze the website in your active Chrome tab with one click. The extension hands the public page URL to your existing authenticated DNA Studio session and stores no AI credentials.
 
+- **React Native Mobile App** — Expo-powered companion app with secure native login, workspace-aware Brand DNA analysis, brand/campaign overview, secure token storage, and no mobile publishing controls.
+
 ## Quick Start
 
 ### Docker (Recommended)
@@ -125,6 +127,26 @@ By default the extension opens `http://localhost:3000`. Use the extension's
 stores only that app URL in Chrome sync storage; authentication remains in the
 DNA Studio browser session and no provider/API credentials are copied into the
 extension.
+
+### Mobile App
+
+The Expo/React Native client lives in `apps/mobile`.
+
+```bash
+cd apps/mobile
+npm install
+npm start
+```
+
+For an Android emulator, the default server URL is `http://10.0.2.2:3000`.
+For a physical phone on the same network, enter the PC's LAN address (for
+example `http://192.168.1.20:3000`) or use a hosted HTTPS DNA Studio URL.
+
+The app authenticates through dedicated mobile endpoints using an opaque
+30-day bearer token. Only a SHA-256 hash of that token is stored in PostgreSQL;
+the raw token is stored on-device with Expo SecureStore. The mobile v0.1 client
+can view workspaces, brands and recent campaigns and can run Brand DNA analysis.
+It intentionally does **not** expose scheduling or social publishing actions.
 
 ## Configuration
 
@@ -243,6 +265,8 @@ dna-studio/
 │       └── auth/       # NextAuth configuration
 ├── prisma/             # Database schema and migrations
 ├── workers/            # BullMQ background workers
+├── apps/
+│   └── mobile/         # Expo / React Native companion app
 ├── extensions/
 │   └── chrome/         # One-click Brand DNA analyzer extension
 ├── docker/             # Container entrypoint (+ its tests)
@@ -268,7 +292,7 @@ dna-studio/
 - [x] UGC video generation with creator avatars (Veo, HeyGen, D-ID)
 - [x] Health endpoint (`/api/health`) and container healthcheck
 - [x] CI on every pull request — migrations, entrypoint, build, and a full `docker compose` boot
-- [x] Test suite — 829 tests across the library, API routes, analytics, calendar, team collaboration, PDF export, webhooks, Chrome extension handoff, and key React UI flows, with a coverage gate in CI
+- [x] Test suite — 852 tests across the library, API routes, analytics, calendar, team collaboration, PDF export, webhooks, Chrome extension/mobile auth flows, and key React UI flows, with a coverage gate in CI
 
 ### Up Next
 
@@ -281,7 +305,7 @@ dna-studio/
 - [x] Brand style guide PDF export — workspace-authorized A4 PDF generation from saved Brand DNA, network-isolated rendering, and deployed download verification
 - [x] Webhook integrations (Zapier, n8n) — workspace-scoped signed HTTPS webhooks, SSRF-safe delivery, retries, delivery history, test sends, and event hooks for brands, campaigns, scheduling, publishing, and failures
 - [x] Chrome extension for one-click brand analysis — Manifest V3 toolbar/context-menu handoff, configurable DNA Studio URL, no credential storage, and automatic Brand DNA analysis for the active public website
-- [ ] Mobile app (React Native)
+- [x] Mobile app (React Native) — Expo companion app with hashed bearer-token auth, SecureStore session persistence, workspace-aware Brand DNA analysis, brand/campaign overview, Android bundle verification, and publishing controls intentionally omitted
 
 ## Contributing
 
