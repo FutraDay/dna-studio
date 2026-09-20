@@ -12,7 +12,7 @@ env:
 jobs:
   migrations:
     name: Migrations apply to an empty database
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16-alpine
@@ -55,7 +55,7 @@ jobs:
 
   entrypoint:
     name: Container entrypoint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       # Regression test for #9: transient database failures are retried, a
@@ -64,7 +64,7 @@ jobs:
 
   test:
     name: Unit and API tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -78,7 +78,7 @@ jobs:
 
   build:
     name: Lint, typecheck, build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       DATABASE_URL: postgresql://dnastudio:dnastudio@localhost:5432/dnastudio
       NEXTAUTH_SECRET: placeholder-for-ci-only
@@ -96,7 +96,7 @@ jobs:
 
   mobile:
     name: React Native mobile app
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: apps/mobile
@@ -117,7 +117,7 @@ jobs:
 
   compose:
     name: docker compose up (end to end)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
