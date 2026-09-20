@@ -276,7 +276,7 @@ dna-studio/
 
 ## Roadmap
 
-### Shipped in v0.1.0
+### Shipped in v0.2.0
 
 - [x] Brand DNA extraction from any URL (colors, fonts, tone, audience, industry)
 - [x] Multi-platform campaign generation (Instagram, LinkedIn, Facebook, X/Twitter)
