@@ -139,8 +139,61 @@ describe("AssetCard", () => {
       />
     );
 
-    expect(screen.getByRole("button", { name: /generate image - free local/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /generate background - free local/i })).toBeInTheDocument();
     expect(screen.queryByText(/uses credits/i)).not.toBeInTheDocument();
+  });
+
+  it("composes a professional ad only after explicit local action", async () => {
+    const user = userEvent.setup();
+    const onComposeCreative = vi
+      .fn()
+      .mockResolvedValue("/api/images/creative?assetId=asset_1&filename=local.png");
+
+    render(
+      <AssetCard
+        asset={{
+          ...baseAsset,
+          imagePrompt: "A clean local background",
+          imageUrl: "/api/images/comfyui?filename=local.png&subfolder=&type=output",
+        }}
+        onGenerateImage={vi.fn()}
+        onComposeCreative={onComposeCreative}
+        freeLocalImages
+      />
+    );
+
+    expect(onComposeCreative).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: /compose pro ad/i }));
+    await waitFor(() => expect(onComposeCreative).toHaveBeenCalledWith("asset_1", "professional"));
+    expect(await screen.findByAltText("Generated")).toHaveAttribute(
+      "src",
+      "/api/images/creative?assetId=asset_1&filename=local.png"
+    );
+    expect(screen.getByRole("button", { name: /recompose pro ad/i })).toBeInTheDocument();
+  });
+
+  it("passes the selected creative preset into local background generation", async () => {
+    const user = userEvent.setup();
+    const onGenerateImage = vi.fn().mockResolvedValue("/api/images/comfyui?filename=tradie.png");
+
+    render(
+      <AssetCard
+        asset={{ ...baseAsset, imagePrompt: "Australian service business scene" }}
+        onGenerateImage={onGenerateImage}
+        freeLocalImages
+      />
+    );
+
+    await user.selectOptions(screen.getByLabelText(/creative style/i), "tradie");
+    await user.click(screen.getByRole("button", { name: /generate background - free local/i }));
+
+    await waitFor(() =>
+      expect(onGenerateImage).toHaveBeenCalledWith(
+        "asset_1",
+        "Australian service business scene",
+        "tradie"
+      )
+    );
   });
 
   it("generates an image only after explicit user action", async () => {
@@ -167,7 +220,8 @@ describe("AssetCard", () => {
     await waitFor(() => {
       expect(onGenerateImage).toHaveBeenCalledWith(
         "asset_1",
-        "A polished product shot on a dark studio background"
+        "A polished product shot on a dark studio background",
+        "professional"
       );
     });
     expect(await screen.findByAltText("Generated")).toHaveAttribute(

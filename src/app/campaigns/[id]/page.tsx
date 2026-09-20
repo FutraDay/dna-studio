@@ -141,7 +141,7 @@ export default function CampaignPage() {
 
     const confirmed = window.confirm(
       localImageMode
-        ? `Generate ${pending.length} images locally with ComfyUI? This uses your GPU but no API credits.`
+        ? `Generate ${pending.length} clean background plates locally with ComfyUI? This uses your GPU but no API credits. You can compose each one into a branded ad afterwards.`
         : `Generate ${pending.length} images now? This will call your configured image provider and may consume paid API credits. No images are generated unless you confirm.`
     );
     if (!confirmed) return;
@@ -221,7 +221,7 @@ export default function CampaignPage() {
     return true;
   };
 
-  const handleGenerateImage = async (assetId: string, prompt: string): Promise<string | null> => {
+  const handleGenerateImage = async (assetId: string, prompt: string, preset = "professional"): Promise<string | null> => {
     const confirmed = window.confirm(
       localImageMode
         ? "Generate this image locally with ComfyUI? This uses your GPU but no API credits."
@@ -232,10 +232,21 @@ export default function CampaignPage() {
     const res = await fetch("/api/images/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, assetId, size: "1024x1024" }),
+      body: JSON.stringify({ prompt, assetId, size: "1024x1024", preset }),
     });
     if (!res.ok) return null;
     const data = await res.json();
+    return data.url ?? null;
+  };
+
+  const handleComposeCreative = async (assetId: string, preset = "professional"): Promise<string | null> => {
+    const response = await fetch("/api/images/creative", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assetId, preset }),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
     return data.url ?? null;
   };
 
@@ -446,7 +457,7 @@ export default function CampaignPage() {
                 <p className="text-xs font-medium">Images are generated on demand</p>
                 <p className="text-[11px] text-muted mt-0.5">
                   {localImageMode
-                    ? "Local ComfyUI is active. Images use your GPU and no API credits. Local images are for preview/testing; use a hosted image provider for public social publishing."
+                    ? "Local ComfyUI is active. First generate clean background plates, then use Compose Pro Ad on each card to add deterministic brand copy and layout. Local previews use your GPU and no API credits."
                     : "Review the copy first. Generating images uses your configured image-provider API credits."}
                 </p>
               </div>
@@ -458,7 +469,9 @@ export default function CampaignPage() {
                 >
                   {imageGenProgress
                     ? `${imageGenProgress.done}/${imageGenProgress.total}`
-                    : `Generate ${campaign.assets.filter((asset) => asset.imagePrompt && !asset.imageUrl).length} images ${localImageMode ? "- Free Local" : "(uses credits)"}`}
+                    : localImageMode
+                      ? `Generate ${campaign.assets.filter((asset) => asset.imagePrompt && !asset.imageUrl).length} backgrounds - Free Local`
+                      : `Generate ${campaign.assets.filter((asset) => asset.imagePrompt && !asset.imageUrl).length} images (uses credits)`}
                 </Button>
               )}
             </div>
@@ -513,6 +526,7 @@ export default function CampaignPage() {
                         onSchedule={handleSchedule}
                         onUpdateCaption={handleUpdateCaption}
                         onGenerateImage={handleGenerateImage}
+                        onComposeCreative={handleComposeCreative}
                         freeLocalImages={localImageMode}
                       />
                     ))}
@@ -537,6 +551,7 @@ export default function CampaignPage() {
                         onSchedule={handleSchedule}
                         onUpdateCaption={handleUpdateCaption}
                         onGenerateImage={handleGenerateImage}
+                        onComposeCreative={handleComposeCreative}
                         freeLocalImages={localImageMode}
                       />
                     ))}

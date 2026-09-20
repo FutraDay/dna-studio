@@ -34,7 +34,8 @@ interface AssetCardProps {
   onPublish?: (id: string) => void;
   onSchedule?: (id: string, date: string) => void;
   onUpdateCaption?: (id: string, caption: string) => Promise<boolean>;
-  onGenerateImage?: (id: string, prompt: string) => Promise<string | null>;
+  onGenerateImage?: (id: string, prompt: string, preset: string) => Promise<string | null>;
+  onComposeCreative?: (id: string, preset: string) => Promise<string | null>;
   freeLocalImages?: boolean;
 }
 
@@ -58,6 +59,7 @@ export function AssetCard({
   onSchedule,
   onUpdateCaption,
   onGenerateImage,
+  onComposeCreative,
   freeLocalImages = false,
 }: AssetCardProps) {
   const [editing, setEditing] = useState(false);
@@ -67,6 +69,8 @@ export function AssetCard({
   const [showMenu, setShowMenu] = useState(false);
   const [imageUrl, setImageUrl] = useState(asset.imageUrl);
   const [generatingImage, setGeneratingImage] = useState(false);
+  const [composingCreative, setComposingCreative] = useState(false);
+  const [creativePreset, setCreativePreset] = useState("professional");
   const [savingCaption, setSavingCaption] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -77,6 +81,10 @@ export function AssetCard({
   useEffect(() => {
     if (!editing) setCaption(asset.caption);
   }, [asset.caption, editing]);
+
+  useEffect(() => {
+    setImageUrl(asset.imageUrl);
+  }, [asset.imageUrl]);
 
   const handleSaveCaption = async () => {
     if (!onUpdateCaption || captionInvalid || savingCaption) return;
@@ -100,10 +108,21 @@ export function AssetCard({
     if (!asset.imagePrompt || !onGenerateImage) return;
     setGeneratingImage(true);
     try {
-      const url = await onGenerateImage(asset.id, asset.imagePrompt);
+      const url = await onGenerateImage(asset.id, asset.imagePrompt, creativePreset);
       if (url) setImageUrl(url);
     } finally {
       setGeneratingImage(false);
+    }
+  };
+
+  const handleComposeCreative = async () => {
+    if (!onComposeCreative || !imageUrl) return;
+    setComposingCreative(true);
+    try {
+      const url = await onComposeCreative(asset.id, creativePreset);
+      if (url) setImageUrl(url);
+    } finally {
+      setComposingCreative(false);
     }
   };
 
@@ -269,7 +288,26 @@ export function AssetCard({
             </div>
           )}
 
-          {/* Generate image button */}
+          {freeLocalImages && asset.imagePrompt && (
+            <div className="mt-3">
+              <label className="block text-[10px] uppercase tracking-[0.16em] text-muted mb-1.5">
+                Creative style
+              </label>
+              <select
+                aria-label="Creative style"
+                value={creativePreset}
+                onChange={(event) => setCreativePreset(event.target.value)}
+                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-foreground focus:outline-none focus:border-accent/40"
+              >
+                <option value="professional">Professional Photography</option>
+                <option value="tradie">Tradie / Service Business</option>
+                <option value="product">Product / UI</option>
+                <option value="before-after">Before to After Automation</option>
+              </select>
+            </div>
+          )}
+
+          {/* Image creation controls */}
           {asset.imagePrompt && !imageUrl && onGenerateImage && (
             <Button
               size="sm"
@@ -280,11 +318,41 @@ export function AssetCard({
             >
               <Sparkles className="w-3 h-3" />
               {generatingImage
-                ? "Generating..."
+                ? "Generating background..."
                 : freeLocalImages
-                  ? "Generate Image - Free Local"
+                  ? "Generate Background - Free Local"
                   : "Generate Image - Uses Credits"}
             </Button>
+          )}
+
+          {freeLocalImages && imageUrl && (onGenerateImage || onComposeCreative) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+              {asset.imagePrompt && onGenerateImage && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleGenerateImage}
+                  disabled={generatingImage || composingCreative}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  {generatingImage ? "Regenerating..." : "Regenerate Background"}
+                </Button>
+              )}
+              {onComposeCreative && (
+                <Button
+                  size="sm"
+                  onClick={handleComposeCreative}
+                  disabled={generatingImage || composingCreative}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  {composingCreative
+                    ? "Composing..."
+                    : imageUrl.startsWith("/api/images/creative")
+                      ? "Recompose Pro Ad"
+                      : "Compose Pro Ad"}
+                </Button>
+              )}
+            </div>
           )}
 
           {showScheduler && (

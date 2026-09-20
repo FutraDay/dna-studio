@@ -258,7 +258,7 @@ describe("Campaign review A/B controls", () => {
     render(<CampaignPage />);
 
     expect(await screen.findByText(/local comfyui is active/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /generate 1 images - free local/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /generate 1 backgrounds - free local/i })).toBeInTheDocument();
     expect(screen.queryByText(/uses your configured image-provider api credits/i)).not.toBeInTheDocument();
   });
 

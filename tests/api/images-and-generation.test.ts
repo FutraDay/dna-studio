@@ -11,12 +11,14 @@ vi.mock("@/lib/db", () => {
 });
 vi.mock("@/lib/auth/session", () => ({ requireSession: vi.fn(), getSession: vi.fn() }));
 vi.mock("@/lib/image/client", () => ({ getImageProvider: vi.fn() }));
+vi.mock("@/lib/settings/resolve", () => ({ resolveSettings: vi.fn() }));
 vi.mock("@/lib/video/client", () => ({ getVideoProvider: vi.fn() }));
 vi.mock("@/lib/llm/client", () => ({ generateText: vi.fn() }));
 
 import { prisma } from "@/lib/db";
 import { requireSession } from "@/lib/auth/session";
 import { getImageProvider } from "@/lib/image/client";
+import { resolveSettings } from "@/lib/settings/resolve";
 import { getVideoProvider } from "@/lib/video/client";
 import { generateText } from "@/lib/llm/client";
 import { POST as generateImage } from "@/app/api/images/generate/route";
@@ -27,6 +29,7 @@ const asset = vi.mocked(prisma.asset);
 const campaign = vi.mocked(prisma.campaign);
 const session = vi.mocked(requireSession);
 const imageProvider = vi.mocked(getImageProvider);
+const settings = vi.mocked(resolveSettings);
 const videoProvider = vi.mocked(getVideoProvider);
 const llmText = vi.mocked(generateText);
 
@@ -35,6 +38,7 @@ const post = (url: string, body: unknown) =>
 
 beforeEach(() => {
   session.mockResolvedValue({ user: { id: "user_1", email: "a@b.c" } } as never);
+  settings.mockResolvedValue({ imageProvider: "openai" } as never);
 });
 
 describe("POST /api/images/generate", () => {
@@ -43,7 +47,10 @@ describe("POST /api/images/generate", () => {
   beforeEach(() => {
     generate.mockResolvedValue({ url: "https://cdn/out.png" });
     imageProvider.mockResolvedValue({ generate } as never);
-    asset.findFirst.mockResolvedValue({ id: "asset_1" } as never);
+    asset.findFirst.mockResolvedValue({
+      id: "asset_1",
+      campaign: { brand: { dna: { name: "FutraDay", colors: [] } } },
+    } as never);
     asset.update.mockResolvedValue({ id: "asset_1" } as never);
   });
 
@@ -53,6 +60,24 @@ describe("POST /api/images/generate", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ url: "https://cdn/out.png" });
     expect(generate).toHaveBeenCalledWith("a mug", { size: "1024x1024" });
+  });
+
+  it("rewrites campaign prompts into background-only directions for local ComfyUI", async () => {
+    settings.mockResolvedValue({ imageProvider: "comfyui" } as never);
+
+    await generateImage(
+      post("/api/images/generate", {
+        prompt: "A futuristic dashboard with charts, graph and robot operator",
+        assetId: "asset_1",
+        preset: "tradie",
+      })
+    );
+
+    const generatedPrompt = generate.mock.calls[0][0] as string;
+    expect(generatedPrompt).toContain("BACKGROUND PLATE ONLY");
+    expect(generatedPrompt).toContain("NO readable text");
+    expect(generatedPrompt).toContain("trade or service-business environment");
+    expect(generatedPrompt.toLowerCase()).not.toContain("futuristic dashboard");
   });
 
   it("passes a requested size through", async () => {
@@ -82,7 +107,10 @@ describe("POST /api/images/generate", () => {
           },
         },
       },
-      select: { id: true },
+      select: {
+        id: true,
+        campaign: { select: { brand: { select: { dna: true } } } },
+      },
     });
     expect(asset.update).toHaveBeenCalledWith({
       where: { id: "asset_1" },
