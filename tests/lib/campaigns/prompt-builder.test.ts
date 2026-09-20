@@ -66,6 +66,23 @@ describe("buildCampaignPrompt", () => {
     expect(prompt).toContain("TARGET PLATFORMS: instagram, linkedin");
   });
 
+
+  it("scopes assets strictly to the selected platforms and exact total", () => {
+    const prompt = buildCampaignPrompt(dna, "goal", ["instagram", "linkedin"]);
+    expect(prompt).toContain("The only allowed asset platforms are: instagram, linkedin");
+    expect(prompt).toContain("exactly 2 asset object(s)");
+    expect(prompt).toContain("exactly 10 assets in total");
+    expect(prompt).toContain("Never generate content for an unrequested platform");
+  });
+
+  it("keeps local-friendly output concise enough to finish structured JSON", () => {
+    const prompt = buildCampaignPrompt(dna, "goal", ["linkedin"]);
+    expect(prompt).toContain("OUTPUT BREVITY RULES");
+    expect(prompt).toContain("maximum 24 words");
+    expect(prompt).toContain("LinkedIn captions: roughly 45-90 words");
+    expect(prompt).toContain("Image prompts: 18-30 words");
+  });
+
   it("defaults to English", () => {
     expect(buildCampaignPrompt(dna, "goal", ["instagram"])).toContain("LANGUAGE: English");
   });
@@ -117,21 +134,27 @@ describe("buildCampaignPrompt", () => {
     expect(prompt).toContain("Do not invent a free consultation");
     expect(prompt).toContain("Hypothetical examples must be explicitly framed as hypothetical");
   });
-  it("requires genuine platform adaptation", () => {
+  it("requires genuine platform adaptation without leaking unselected platform rules", () => {
     const prompt = buildCampaignPrompt(dna, "goal", ["instagram", "linkedin"]);
     expect(prompt).toContain("genuinely platform-specific content");
-    expect(prompt).toContain("Do not write like an Instagram caption");
-    expect(prompt).toContain("Twitter: under 280 characters");
+    expect(prompt).toContain("Instagram: visual-first and scannable");
+    expect(prompt).toContain("LinkedIn: professional B2B insight");
+    expect(prompt).not.toContain("Facebook: relatable business situation");
+    expect(prompt).not.toContain("Twitter/X: sharp observation or assertion");
+    expect(prompt).toContain('"platform": "instagram"');
+    expect(prompt).toContain('"platform": "linkedin"');
+    expect(prompt).not.toContain('"platform": "facebook"');
+    expect(prompt).not.toContain('"platform": "twitter"');
   });
 
   it("directs each platform as a distinct editorial product", () => {
     const prompt = buildCampaignPrompt(dna, "goal", ["instagram", "linkedin", "facebook", "twitter"]);
     expect(prompt).toContain("PLATFORM CONTENT DIRECTOR RULES");
-    expect(prompt).toContain("Do not paraphrase the same caption four times");
+    expect(prompt).toContain("do not paraphrase the same caption across platforms");
     expect(prompt).toContain("no more than 2 question-style opening hooks");
     expect(prompt).toContain("materially different in wording and structure");
-    expect(prompt).toContain("no more than 3 hashtags");
-    expect(prompt).toContain("no more than 2 hashtags");
+    expect(prompt).toContain("up to 3 hashtags");
+    expect(prompt).toContain("up to 2 hashtags");
   });
 
   it("assigns distinct content jobs and bans templated openings", () => {

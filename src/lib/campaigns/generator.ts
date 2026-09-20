@@ -28,6 +28,13 @@ export interface GeneratedCampaign {
 const CAMPAIGN_CONTEXT_TOKENS = 8192;
 const REPAIR_CONTEXT_TOKENS = 8192;
 
+function campaignOutputTokens(platforms: string[]): number {
+  // Five concepts still fit comfortably within this budget for one platform,
+  // while additional platforms receive more room. Bounding output prevents
+  // local Ollama runs from drifting toward an 8K-token ceiling for minutes.
+  return Math.min(5120, 2048 + Math.max(0, platforms.length - 1) * 1024);
+}
+
 export async function generateCampaign(
   dna: BrandDNA,
   goal: string,
@@ -46,7 +53,7 @@ export async function generateCampaign(
   ];
 
   return generateJSON<GeneratedCampaign>(messages, {
-    maxTokens: 8192,
+    maxTokens: campaignOutputTokens(platforms),
     contextTokens: CAMPAIGN_CONTEXT_TOKENS,
     temperature: 0.8,
     json: true,
@@ -71,7 +78,7 @@ export async function* streamCampaign(
   ];
 
   yield* streamText(messages, {
-    maxTokens: 8192,
+    maxTokens: campaignOutputTokens(platforms),
     contextTokens: CAMPAIGN_CONTEXT_TOKENS,
     temperature: 0.8,
     json: true,
@@ -176,7 +183,7 @@ Do not explain the changes outside the JSON.`;
   ];
 
   const repaired = await generateJSON<GeneratedCampaign>(messages, {
-    maxTokens: 8192,
+    maxTokens: campaignOutputTokens(platforms),
     contextTokens: REPAIR_CONTEXT_TOKENS,
     temperature: styleRecovery ? 0.1 : 0.3,
     json: true,

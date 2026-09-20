@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeCampaignStyle, repairCampaignDeterministically } from "@/lib/campaigns/style-normalizer";
+import { normalizeCampaignStyle, repairCampaignDeterministically, scopeCampaignPlatforms } from "@/lib/campaigns/style-normalizer";
 import type { CampaignStrategy, GeneratedCampaign } from "@/lib/campaigns/generator";
 
 const strategies: CampaignStrategy[] = [
@@ -94,6 +94,48 @@ describe("normalizeCampaignStyle", () => {
     expect(asset.hashtags).toEqual(["FutraDay", "quotefollowups"]);
     expect(asset.imagePrompt).not.toMatch(/logo and tagline prominently displayed/i);
     expect(asset.imagePrompt).toContain("No words, labels, logos, numbers, or legible controls");
+  });
+
+  it("scopes campaign assets to requested platforms without inventing missing copy", () => {
+    const candidate = campaignWith("A distinct caption for each platform.");
+    candidate.concepts[0].assets.push({
+      ...candidate.concepts[0].assets[0],
+      caption: "Duplicate Instagram asset that should be removed.",
+    });
+
+    const scoped = scopeCampaignPlatforms(candidate, ["linkedin", "instagram"]);
+
+    expect(scoped.concepts.every((concept) =>
+      concept.assets.map((asset) => asset.platform).join(",") === "linkedin,instagram"
+    )).toBe(true);
+    expect(scoped.concepts[0].assets).toHaveLength(2);
+    expect(candidate.concepts[0].assets).toHaveLength(5);
+
+    const missing = scopeCampaignPlatforms(
+      {
+        concepts: candidate.concepts.map((concept) => ({
+          ...concept,
+          assets: concept.assets.filter((asset) => asset.platform !== "linkedin"),
+        })),
+      },
+      ["linkedin"]
+    );
+    expect(missing.concepts.every((concept) => concept.assets.length === 0)).toBe(true);
+  });
+
+  it("repairs generic filler and emoji warnings without another model call", () => {
+    const candidate = campaignWith("Hey business owners ??, streamline your operations and get started today.");
+
+    const repaired = repairCampaignDeterministically(candidate, [
+      { code: "generic_copy", message: 'Concept 1 uses generic filler: "hey business owners", "streamline your operations", "get started".' },
+      { code: "emoji_overuse", message: "Professional campaign copy uses too many emojis." },
+    ]);
+
+    const captions = repaired.concepts.flatMap((concept) => concept.assets).map((asset) => asset.caption.toLowerCase());
+    expect(captions.every((caption) => !caption.includes("hey business owners"))).toBe(true);
+    expect(captions.every((caption) => !caption.includes("streamline your operations"))).toBe(true);
+    expect(captions.every((caption) => !caption.includes("get started"))).toBe(true);
+    expect(repaired.concepts.flatMap((concept) => concept.assets).every((asset) => !/\p{Extended_Pictographic}/u.test(asset.caption))).toBe(true);
   });
 
   it("repairs deterministic quality issues without another model call", () => {

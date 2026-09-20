@@ -33,13 +33,36 @@ export function buildCampaignPrompt(
   language: string = "English"
 ): string {
   const brandContext = buildBrandContext(dna);
+  const platformList = platforms.join(", ");
+  const totalAssets = platforms.length * 5;
+  const platformRules: Record<string, string> = {
+    instagram: "Instagram: visual-first and scannable; use a short hook plus 1-3 short paragraphs or an inline mini-list, roughly 25-60 words, up to 8 hashtags, concise CTA.",
+    linkedin: "LinkedIn: professional B2B insight with a clear point of view, observation, reasoning, and practical takeaway; roughly 45-90 words, no emojis for professional brands, up to 3 hashtags.",
+    facebook: "Facebook: relatable business situation in conversational language with enough context to stand alone; roughly 35-75 words, low-friction CTA, up to 3 hashtags.",
+    twitter: "Twitter/X: sharp observation or assertion, 100-220 characters and always under 280 characters, up to 2 hashtags.",
+  };
+  const selectedPlatformRules = platforms
+    .map((platform) => platformRules[platform])
+    .filter(Boolean)
+    .join("\n");
+  const assetTemplate = platforms
+    .map(
+      (platform) => `        {
+          "platform": "${platform}",
+          "caption": "<concise ${platform}-appropriate caption>",
+          "hashtags": ["<hashtag1>", "<hashtag2>"],
+          "cta": "<distinct call to action, maximum 10 words>",
+          "imagePrompt": "<18-30 word visual prompt using brand colors ${dna.colors.map((c) => c.hex).join(", ")} and a ${dna.tone.primary} aesthetic>"
+        }`
+    )
+    .join(",\n");
 
-  return `You are an expert social media marketing strategist. Generate a comprehensive campaign.
+  return `You are an expert social media marketing strategist. Generate a concise, complete campaign.
 
 ${brandContext}
 
 CAMPAIGN GOAL: ${goal}
-TARGET PLATFORMS: ${platforms.join(", ")}
+TARGET PLATFORMS: ${platformList}
 LANGUAGE: ${language}
 
 Generate exactly 5 campaign concepts. The five concepts must have DISTINCT strategic roles, in this order:
@@ -49,6 +72,12 @@ Generate exactly 5 campaign concepts. The five concepts must have DISTINCT strat
 4. Solution and product - explain how the brand's real product/service solves a specific problem without generic feature dumping.
 5. Conversion - address an objection and use a low-friction CTA. Do not invent a free consultation, free audit, free assessment, free trial, discount, downloadable resource, or other offer unless it is explicitly supported by the verified source excerpt or campaign goal.
 
+PLATFORM SCOPE ? STRICT:
+- The only allowed asset platforms are: ${platformList}.
+- Every concept must contain exactly ${platforms.length} asset object(s): one for each requested platform and no others.
+- The finished campaign must contain exactly ${totalAssets} assets in total.
+- Never generate content for an unrequested platform, even if it appears in the JSON schema examples or editorial rules below.
+
 For each concept, create genuinely platform-specific content rather than shortening the same copy.
 
 Return a JSON object with this EXACT structure. Do not add extra fields such as "text", "body", "title", or "headline". The complete social post must always be stored in "caption":
@@ -57,20 +86,25 @@ Return a JSON object with this EXACT structure. Do not add extra fields such as 
     {
       "name": "<campaign concept name>",
       "strategy": "<problem_awareness|education|proof_trust|solution_product|conversion>",
-      "description": "<2-3 sentence concept description>",
+      "description": "<one concise sentence, maximum 24 words>",
       "theme": "<one-word theme>",
       "assets": [
-        {
-          "platform": "<instagram|linkedin|facebook|twitter>",
-          "caption": "<platform-appropriate caption with line breaks>",
-          "hashtags": ["<hashtag1>", "<hashtag2>", "<hashtag3>"],
-          "cta": "<call to action>",
-          "imagePrompt": "<detailed image generation prompt that incorporates brand colors ${dna.colors.map((c) => c.hex).join(", ")} and ${dna.tone.primary} aesthetic>"
-        }
+${assetTemplate}
       ]
     }
   ]
 }
+
+OUTPUT BREVITY RULES:
+- Keep the JSON compact and finish the complete structure before adding detail.
+- Concept descriptions: exactly one concise sentence, maximum 24 words.
+- CTAs: maximum 10 words.
+- Image prompts: 18-30 words; describe composition, subject, setting, brand colours, and visual tone only.
+- Instagram captions: roughly 25-60 words.
+- LinkedIn captions: roughly 45-90 words.
+- Facebook captions: roughly 35-75 words.
+- Twitter/X captions: 100-220 characters and always under 280 characters.
+- Never repeat information in both caption and CTA just to make the response longer.
 
 CONTENT DIVERSITY RULES:
 1. Do not reuse the same opening hook, sentence pattern, CTA, or central example across concepts.
@@ -89,12 +123,9 @@ EVIDENCE INTEGRITY RULES:
 - Hypothetical examples must be explicitly framed as hypothetical and must not be presented as customer proof.
 
 PLATFORM CONTENT DIRECTOR RULES:
-7. Treat each platform as a different editorial product. Do not paraphrase the same caption four times. Preserve the concept, but change the hook, structure, emphasis, CTA, and reading experience for each platform.
-8. Instagram: visual-first and scannable. Use a short hook plus 2-5 short paragraphs or an inline mini-list. Favor save/share value, carousel/Reel-friendly framing, and a concise CTA. Natural emojis are optional, not required.
-9. LinkedIn: write a professional B2B insight with a clear point of view. Use an observation, reasoning, and a practical takeaway. Prefer roughly 60-180 words, minimal emoji use, and no more than 3 hashtags. Do not write like an Instagram caption.
-10. Facebook: use a relatable business situation in conversational language, enough context to stand alone, and a low-friction comment/reply CTA. Prefer roughly 45-130 words and no more than 3 hashtags.
-11. Twitter: under 280 characters, ideally 100-240 characters. Lead with a sharp observation or assertion rather than compressing the LinkedIn post. Use no more than 2 hashtags.
-12. Across the entire 20-asset campaign, use no more than 2 question-style opening hooks. Most posts should open with assertions, observations, scenarios, contrasts, or direct statements.
+7. Treat each selected platform as a different editorial product. When more than one platform is selected, do not paraphrase the same caption across platforms; change the hook, structure, emphasis, CTA, and reading experience.
+${selectedPlatformRules}
+12. Across the entire ${totalAssets}-asset campaign, use no more than 2 question-style opening hooks. Most posts should open with assertions, observations, scenarios, contrasts, or direct statements.
 13. Do not repeat an opening phrase, CTA wording, or identical hashtag set. Avoid templated openings entirely: "Curious about", "Worried about", "Thinking about", "Ever wondered", "Ready to", "Tired of", "Why settle for", and "Think again".
 14. Do not use generic filler such as "Hey business owners", "we want to hear from you", "our software solutions", "boost your business efficiency", "focus on growth", "streamline your operations", "get started", "ditch manual processes for good", "The Benefits of Automation", or "The Solution to Manual Business Processes". Replace generic claims with a specific operational observation, example, or takeaway.
 15. Never put hashtags inside the caption text. Hashtags belong only in the separate "hashtags" array. Each hashtag must be a single valid token with no spaces.
@@ -110,7 +141,7 @@ VISUAL DIVERSITY RULES:
 23. Do not make every visual a laptop, dashboard, device mockup, or abstract chart, even for software/AI brands.
 24. Do NOT invent fake product screenshots or fake readable UI and present them as the brand's real software. If showing a conceptual interface, make it clearly illustrative and avoid tiny pseudo-text.
 25. Avoid generated marketing copy, labels, statistics, logos, and tiny text inside the image. The social post caption carries the message.
-26. Image prompts must reference the brand's actual colors and visual tone while changing composition, setting, subject, camera angle, and visual metaphor across concepts.`;
+26. Image prompts must be concise (18-30 words), reference the brand's actual colors and visual tone, and change composition, setting, subject, camera angle, and visual metaphor across concepts.`;
 }
 
 export function buildImagePrompt(

@@ -92,33 +92,11 @@ function NewCampaignContent() {
       if (!res.ok) throw new Error("Failed to load suggestions");
       const data: Suggestion[] = await res.json();
       if (suggestionsLoadedForBrand.current !== bId) return;
+      // Suggestions are text-first. Never generate images automatically here:
+      // image providers can be metered/paid, so image generation must remain an
+      // explicit user action elsewhere in the product. Cached imageUrl values
+      // are still displayed when they already exist.
       setSuggestions(data);
-
-      // Generate preview images for suggestions that don't have one yet
-      data.forEach((s, i) => {
-        if (!s.imagePrompt || s.imageUrl) return;
-        fetch("/api/images/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: s.imagePrompt, size: "1024x1024" }),
-        })
-          .then((r) => r.json())
-          .then((img) => {
-            if (suggestionsLoadedForBrand.current !== bId) return;
-            setSuggestions((prev) =>
-              prev.map((item, idx) =>
-                idx === i ? { ...item, imageUrl: img.url } : item
-              )
-            );
-            // Persist the generated image URL back to the cache
-            fetch(`/api/campaigns/suggestions?brandId=${bId}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ index: i, imageUrl: img.url }),
-            }).catch(() => {});
-          })
-          .catch(() => {});
-      });
     } catch {
       // Keep empty suggestions on error
     } finally {
@@ -369,8 +347,11 @@ function NewCampaignContent() {
                               className="object-cover group-hover:scale-105 transition-transform duration-500"
                             />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Loader2 className="w-5 h-5 text-muted/30 animate-spin" />
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-2 px-6 text-center">
+                              <Sparkles className="w-5 h-5 text-muted/35" />
+                              <span className="text-[11px] text-muted/50">
+                                Visual concept - no image generated automatically
+                              </span>
                             </div>
                           )}
                           {/* Gradient overlay */}
